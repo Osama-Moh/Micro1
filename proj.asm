@@ -202,13 +202,13 @@ GAME:     cmp dx, 15h
             jmp MoveSquare;
             LEFT :
             cmp [rowY] ,00h ; 
-            jb exit ;
+            jz exit ;
             sub [rowY],19h;
             popA
             jmp MoveSquare;
             RIGHT:
             cmp[rowY] ,  0AFh; 
-            jA exit
+            jz exit
             add [rowY],19h;
             popA
             jmp MoveSquare;
