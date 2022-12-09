@@ -1,3 +1,4 @@
+.286
 .model Small
 .stack 64
 .data
@@ -15,7 +16,7 @@ Pieces      DB    8h DUP(0), 0ffh DUP(0), 20h
 countX      DW    ?
 countY      DW    ?
 
-chosenSquare    db     03CH
+chosenSquare    db     09H
 chosenSquareColor   DB  ?
 rowX            DW      ?
 rowY            DW      ?
@@ -129,16 +130,16 @@ PUSH CX
 CALL SquaresCalculation
 add sp, 2h
 
+MoveSquare:            
 CALL GetSquareColor
 mov dl, [chosenSquareColor]
 mov dh, 0h
-
-GAME:     cmp dx, 35h
+GAME:     cmp dx, 40h
           jnz flashColor
           mov al, [chosenSquareColor]
           mov ah, 0ch
           jmp flashing
-          flashColor:   mov ax, 0c35h
+          flashColor:   mov ax, 0c40h
           flashing: PUSH DX
                     PUSH AX
                     CALL DrawSquare
@@ -149,9 +150,42 @@ GAME:     cmp dx, 35h
                     pop dx
                     sub dx, 0c00h
                     add sp, 2h
+;;;;                ;;; test arrows
+                    pushA 
+                    mov ah,01h
+                    int 16h
+                    jz Nopress
+                    mov ah,0h
+                    int 16h
+                    jmp handlearrows
+                    Nopress: POPA   
+                    ;;;;
                     JMP GAME
-         
-                    
+            Handlearrows: cmp ah , 48h ;
+                          jz UP 
+                          cmp ah , 50h ; 
+                          jz DOWN 
+                          cmp ah , 4Dh ; 
+                          jz RIGHT 
+                          cmp ah , 4Bh;  
+                          jz LEFT;
+                          popA; 
+                          jmp MoveSquare;   
+            UP:sub [rowX],19h;
+            popA
+            jmp MoveSquare;
+            DOWN:add [rowX],19h;
+            popA
+            jmp MoveSquare;
+            LEFT :sub [rowY],21h;
+            popA
+            jmp MoveSquare;
+            RIGHT:add [rowY],21h;
+            popA
+            jmp MoveSquare;
+            
+            
+
 
 ;mov ah , 0h ;
 ;mov al , 3h ;
@@ -295,11 +329,12 @@ SquaresCalculation  PROC
     mov dx, 0h
     mov cx, 19h
     mul cx
+    inc ax ;
     mov [rowX], ax
     mov ax, si
     mov cx, 19h
     mul cx
-    inc ax
+    ;inc ax
     mov [rowY], ax
 
     RET
@@ -309,7 +344,7 @@ GetSquareColor      PROC
     mov ah, 0dh
     mov bh, 0h
     mov cx, [rowX]
-    add cx, 2h
+    add cx, 30h
     mov dx, [rowY]
     add dx, 2h
     int 10h
