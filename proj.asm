@@ -177,10 +177,10 @@ GAME:     cmp dx, 40h
             DOWN:add [rowX],19h;
             popA
             jmp MoveSquare;
-            LEFT :sub [rowY],21h;
+            LEFT :sub [rowY],19h;
             popA
             jmp MoveSquare;
-            RIGHT:add [rowY],21h;
+            RIGHT:add [rowY],19h;
             popA
             jmp MoveSquare;
             
