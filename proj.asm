@@ -136,12 +136,12 @@ MoveSquare:
 CALL GetSquareColor
 mov dl, [chosenSquareColor]
 mov dh, 0h
-GAME:     cmp dx, 35h
+GAME:     cmp dx, 15h
           jnz flashColor
           mov al, [chosenSquareColor]
           mov ah, 0ch
           jmp flashing
-          flashColor:   mov ax, 0c35h
+          flashColor:   mov ax, 0c15h
           flashing: PUSH DX
                     PUSH AX
                     CALL DrawSquare
@@ -164,7 +164,7 @@ GAME:     cmp dx, 35h
                     ;;;;
                     JMP GAME
             Handlearrows: 
-                          cmp [Currentcolor] , 0c35h ;
+                          cmp [Currentcolor] , 0c15h ;
                           jnz COMP ;
                           push AX; 
                           mov cx , [Currentcolor] 
