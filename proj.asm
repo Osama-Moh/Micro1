@@ -2,6 +2,7 @@
 .model Small
 .stack 64
 .data
+Currentcolor    DW      ? 
 boardFile   db   'chess.bin', 0h;
 firstState  db   'board.txt', 0h;
 DIRECTORY       DB      'D:\Pieces',0h
@@ -20,6 +21,7 @@ chosenSquare    db     09H
 chosenSquareColor   DB  ?
 rowX            DW      ?
 rowY            DW      ?
+
 
 chessData db  9C40h dup(?);
 
@@ -134,12 +136,12 @@ MoveSquare:
 CALL GetSquareColor
 mov dl, [chosenSquareColor]
 mov dh, 0h
-GAME:     cmp dx, 40h
+GAME:     cmp dx, 35h
           jnz flashColor
           mov al, [chosenSquareColor]
           mov ah, 0ch
           jmp flashing
-          flashColor:   mov ax, 0c40h
+          flashColor:   mov ax, 0c35h
           flashing: PUSH DX
                     PUSH AX
                     CALL DrawSquare
@@ -150,10 +152,10 @@ GAME:     cmp dx, 40h
                     pop dx
                     sub dx, 0c00h
                     add sp, 2h
-;;;;                ;;; test arrows
+;;;;;;;;;;;;;;;;;;;;;; test arrows
                     pushA 
-                    mov ah,01h
-                    int 16h
+                    mov ah,01h;
+                    int 16h;
                     jz Nopress
                     mov ah,0h
                     int 16h
@@ -161,7 +163,21 @@ GAME:     cmp dx, 40h
                     Nopress: POPA   
                     ;;;;
                     JMP GAME
-            Handlearrows: cmp ah , 48h ;
+            Handlearrows: 
+                          cmp [Currentcolor] , 0c35h ;
+                          jnz COMP ;
+                          push AX; 
+                          mov cx , [Currentcolor] 
+                          sub cx , 0c00h;
+                          push cx ;
+                          mov cl , [chosenSquareColor]
+                          mov ch , 0ch ; 
+                          push cx ; 
+                          CALL DrawSquare
+                          add sp , 4h ;
+                          pop AX; 
+                          COMP:
+                          cmp ah , 48h ;
                           jz UP 
                           cmp ah , 50h ; 
                           jz DOWN 
@@ -169,20 +185,34 @@ GAME:     cmp dx, 40h
                           jz RIGHT 
                           cmp ah , 4Bh;  
                           jz LEFT;
+                        exit:
                           popA; 
                           jmp MoveSquare;   
-            UP:sub [rowX],19h;
+            UP:
+            cmp [rowX], 1h ;
+            jz exit
+            sub [rowX],19h;
             popA
             jmp MoveSquare;
-            DOWN:add [rowX],19h;
+            DOWN:
+            cmp [rowX] , 0B0h;
+            jz exit 
+            add [rowX],19h;
             popA
             jmp MoveSquare;
-            LEFT :sub [rowY],19h;
+            LEFT :
+            cmp [rowY] ,00h ; 
+            jb exit ;
+            sub [rowY],19h;
             popA
             jmp MoveSquare;
-            RIGHT:add [rowY],19h;
+            RIGHT:
+            cmp[rowY] ,  0AFh; 
+            jA exit
+            add [rowY],19h;
             popA
             jmp MoveSquare;
+
             
             
 
@@ -286,7 +316,8 @@ DrawSquare      PROC
     mov bp, sp
     mov si, [bp+4]
     mov di, [bp+2]
-    
+    mov [Currentcolor], di 
+
     mov cx, [rowY]
     mov dx, [rowX]
     add cx, 48H
