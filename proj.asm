@@ -2,6 +2,14 @@
 .model Small
 .stack 64
 .data
+
+sourceSquare    db      0FFH
+destSquare      db      0FFH
+destX           dw        ?
+destY           dw        ?
+rowX            DW      ?
+rowY            DW      ?
+
 Currentcolor    DW      ? 
 boardFile   db   'chess.bin', 0h;
 firstState  db   'board.txt', 0h;
@@ -19,8 +27,7 @@ countY      DW    ?
 
 chosenSquare    db     3cH
 chosenSquareColor   DB  ?
-rowX            DW      ?
-rowY            DW      ?
+
 
 
 chessData db  9C40h dup(?);
@@ -153,8 +160,99 @@ GAME:     cmp dx, 15h
                     pop dx
                     sub dx, 0c00h
                     add sp, 2h
+
+
+;;;;;;;;;;;;;;;;;;;;;; Moving Pieces
+        mov ah, 1H
+        int 16h
+        cmp al, 0dh
+        jnz Arrows
+        
+        mov al, [sourceSquare]
+        cmp al, 0ffh
+        jnz Dest
+        mov al, [chosenSquare]
+        mov [sourceSquare], al
+        MOV CL, [chosenSquareColor]
+        MOV CH, 0H
+        PUSH CX
+        jmp Arrows
+
+        Dest:   mov al, [chosenSquare]
+        mov [destSquare], al
+
+        push dx
+        mov ax, 0a000h
+        mov es, ax
+        mov ax, [rowX]
+        mov [destX], ax
+        mov bx, [rowY]
+        add bx, 30h
+        mov [destY], bx
+
+        PUSH AX
+        push bx
+        mov cl, [sourceSquare]
+        mov ch, 0h
+        PUSH CX
+        CALL SquaresCalculation
+        add sp, 2h
+        add [rowY], 30h
+        pop bx
+        pop ax
+
+        mov cx, 140h
+        mul cx
+        add ax, bx
+        mov di, ax
+
+        pop dx
+        pop cx
+        push dx
+        mov si, cx
+        
+        mov bl, 0h
+        mov bp, [rowX]
+        add bp, 19h
+        MOVEPIECE:      mov bh, 0h
+                        mov cx, [rowY]
+                        mov dx, [rowX]
+                        mov ah, 0dh
+                        int 10h
+
+                        mov ah, 0h
+                        cmp ax, si
+                        jz NOCOPY
+                        STOSB
+
+                        NOCOPY:
+                        inc bl
+                        inc [rowY]
+                        inc di
+                        cmp bl, 19h
+                        jnz MOVEPIECE
+                        mov bl, 0h
+                        sub DI, 19H
+                        add di, 140h
+                        sub [rowY], 19h
+                        add [rowX], 1h
+                        cmp [rowX], bp
+                        jz Arrows
+                        jmp MOVEPIECE
+
+
+
+mov ax, [destX]
+mov [rowX], ax
+mov ax, [destY]
+sub ax, 30h
+mov [rowY], ax
+mov [sourceSquare], 0ffh
+mov [destSquare], 0ffh
+POP DX
+
 ;;;;;;;;;;;;;;;;;;;;;; test arrows
-                    pushA 
+                    Arrows: pushA 
                     mov ah,01h;
                     int 16h;
                     jz Nopress
@@ -193,24 +291,28 @@ GAME:     cmp dx, 15h
             cmp [rowX], 1h ;
             jz exit
             sub [rowX],19h;
+            sub [chosenSquare], 8h
             popA
             jmp MoveSquare;
             DOWN:
             cmp [rowX] , 0B0h;
             jz exit 
             add [rowX],19h;
+            add [chosenSquare], 8h
             popA
             jmp MoveSquare;
             LEFT :
             cmp [rowY] ,00h ; 
             jz exit ;
             sub [rowY],19h;
+            sub [chosenSquare], 1h
             popA
             jmp MoveSquare;
             RIGHT:
             cmp[rowY] ,  0AFh; 
             jz exit
             add [rowY],19h;
+            add [chosenSquare], 1h
             popA
             jmp MoveSquare;
 
@@ -362,12 +464,12 @@ SquaresCalculation  PROC
     mov cx, 19h
     mul cx
     inc ax ;
-    mov [rowX], ax
+    mov [rowX], ax ; Down or Up 
     mov ax, si
     mov cx, 19h
     mul cx
     ;inc ax
-    mov [rowY], ax
+    mov [rowY], ax ; Left or Right
 
     RET
 SquaresCalculation  ENDP
