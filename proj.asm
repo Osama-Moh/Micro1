@@ -9,6 +9,7 @@ destX           dw        ?
 destY           dw        ?
 rowX            DW      ?
 rowY            DW      ?
+movementCalculation     DW      ?
 
 Currentcolor    DW      ? 
 boardFile   db   'chess.bin', 0h;
@@ -206,6 +207,13 @@ GAME:     cmp dx, 15h
         add ax, bx
         mov di, ax
 
+        mov ax, [rowX]
+        mov bx, [rowY]
+        mov cx, 140h
+        mul cx
+        add ax, bx
+        mov [movementCalculation], ax
+
         pop dx
         pop cx
         push dx
@@ -224,25 +232,33 @@ GAME:     cmp dx, 15h
                         cmp ax, si
                         jz NOCOPY
                         STOSB
+                        mov cx, di
+                        mov di, [movementCalculation]
+                        mov ax, si
+                        STOSB
+                        mov di, cx
+                        JMP COPY
 
-                        NOCOPY:
-                        inc bl
+                        NOCOPY: inc di
+                        COPY: inc bl
+                        inc [movementCalculation]
                         inc [rowY]
-                        inc di
                         cmp bl, 19h
                         jnz MOVEPIECE
                         mov bl, 0h
                         sub DI, 19H
                         add di, 140h
+                        sub [movementCalculation], 19H
+                        add [movementCalculation], 140h
                         sub [rowY], 19h
                         add [rowX], 1h
                         cmp [rowX], bp
-                        jz Arrows
+                        jz Reset
                         jmp MOVEPIECE
 
 
 
-mov ax, [destX]
+Reset:  mov ax, [destX]
 mov [rowX], ax
 mov ax, [destY]
 sub ax, 30h
@@ -250,6 +266,7 @@ mov [rowY], ax
 mov [sourceSquare], 0ffh
 mov [destSquare], 0ffh
 POP DX
+
 
 ;;;;;;;;;;;;;;;;;;;;;; test arrows
                     Arrows: pushA 
