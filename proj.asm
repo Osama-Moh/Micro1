@@ -215,7 +215,7 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
         mov cx, 140h
         mul cx
         add ax, bx
-        mov [movementCalculation], ax ; movementCalculation know holds the offset of the Sourcesquare pixel 
+        mov [sourceLocationInES], ax ; sourceLocationInES know holds the offset of the Sourcesquare pixel 
         
         pop dx ; number of sourceSquare ;
         pop cx ; color of the background 
@@ -237,7 +237,7 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
                         jz NOCOPY
                         STOSB ; store  es:di [location if the pixel of destination Square in extra segement] = AL [color of the pixel ]
                         mov cx, di
-                        mov di, [movementCalculation] ; move the source Square pixel offset to start deleting the source square and move the piece  
+                        mov di, [sourceLocationInES] ; move the source Square pixel offset to start deleting the source square and move the piece  
                         mov ax, si; si contain background color ; 
                         STOSB ; es:di = al;
                         mov di, cx ; return back the offest of di 
@@ -245,7 +245,7 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
 ; NOTE : AFTER STOSB di incremented automaticaly  
                         NOCOPY: inc di ; if no copy done I need to move di to the next pixel 
                         COPY: inc bl ; increment coloumn counter ;
-                        inc [movementCalculation] ; increment to move to the next pixel 
+                        inc [sourceLocationInES] ; increment to move to the next pixel 
                         inc [rowY] 
                         cmp bl, 19h ; after 25d colomn i need to move to the next row ; 
                         jnz MOVEPIECE
@@ -255,9 +255,9 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
                         add di, 140h ; add 320d to move to the next row in es ; NOTE : ES number the pixel in row as shown below  ; 
                         ; p1 p2 p3 
                         ; p4 p5 p6 
-                        ; operation that is done to DI is done to [movementCalculation]
-                        sub [movementCalculation], 19H ; 
-                        add [movementCalculation], 140h ;  
+                        ; operation that is done to DI is done to [sourceLocationInES]
+                        sub [sourceLocationInES], 19H ; 
+                        add [sourceLocationInES], 140h ;  
                         sub [rowY], 19h ; decrement rowY ;  
                         add [rowX], 1h ;  
                         cmp [rowX], bp ; to check if we reached the the last Row or not 
