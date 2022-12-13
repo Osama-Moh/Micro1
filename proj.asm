@@ -9,7 +9,7 @@ destX           dw        ? ; coordinates of destSquare
 destY           dw        ?
 rowX            DW      ? ; coordinates SrcSquare 
 rowY            DW      ?
-movementCalculation     DW      ?
+sourceLocationInES     DW      ?
 
 Currentcolor    DW      ? 
 boardFile   db   'chess.bin', 0h; chess board 
