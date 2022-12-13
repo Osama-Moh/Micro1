@@ -9,7 +9,7 @@ destX           dw        ?
 destY           dw        ?
 rowX            DW      ?
 rowY            DW      ?
-movementCalculation     DW      ?
+sourceLocationInES     DW      ?
 
 Currentcolor    DW      ? 
 boardFile   db   'chess.bin', 0h;
@@ -212,7 +212,7 @@ GAME:     cmp dx, 15h
         mov cx, 140h
         mul cx
         add ax, bx
-        mov [movementCalculation], ax
+        mov [sourceLocationInES], ax
 
         pop dx
         pop cx
@@ -233,7 +233,7 @@ GAME:     cmp dx, 15h
                         jz NOCOPY
                         STOSB
                         mov cx, di
-                        mov di, [movementCalculation]
+                        mov di, [sourceLocationInES]
                         mov ax, si
                         STOSB
                         mov di, cx
@@ -241,15 +241,15 @@ GAME:     cmp dx, 15h
 
                         NOCOPY: inc di
                         COPY: inc bl
-                        inc [movementCalculation]
+                        inc [sourceLocationInES]
                         inc [rowY]
                         cmp bl, 19h
                         jnz MOVEPIECE
                         mov bl, 0h
                         sub DI, 19H
                         add di, 140h
-                        sub [movementCalculation], 19H
-                        add [movementCalculation], 140h
+                        sub [sourceLocationInES], 19H
+                        add [sourceLocationInES], 140h
                         sub [rowY], 19h
                         add [rowX], 1h
                         cmp [rowX], bp
