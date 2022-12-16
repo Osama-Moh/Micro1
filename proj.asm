@@ -85,6 +85,7 @@ DrawInitialState     MACRO
 
 ENDM
 
+;;load file in the trialframes
 PlacePowerup    Macro   ;;this macro will be executed when the number of correct movements is equal to specific number
     ;; it is call will be inside the movement process and it will have a value in the encoding to make the movement avaialble
     Incorrect:
@@ -96,13 +97,37 @@ PlacePowerup    Macro   ;;this macro will be executed when the number of correct
     cmp Squares[bx],0H
     jnz Incorrect
     
+    ;;open image file
+    mov bx,5h;
+    mov cl,Squares[bx]
+    mov al,8h
+    mul cl
+    mov si,offset Pieces
+    add si,ax
+    mov byte pre[si+7],0H
+    mov cx,271H
+    mov di,offset chessData
+    push si
+    push cx
+    push di
+    call HandleFile
+    popa
+    mov byte ptr [si+7]
+    push bx
+
     mov al,rand
     mov ah,0h
     push ax
     call SquaresCalculation 
     pop ax
+    ADD SP, 2H 
+    MOV dx, [rowX]
+    PUSH dx
+    mov dx, [rowY]
+    push dx
     Call Drawpowerup
-
+    pop dx
+    pop dx
 ENDM
 
 .code
@@ -157,8 +182,9 @@ DrawInitialState
 mov ah , 0h ;
 int 16h ;
 
-  
+;;;;;;;;;;;;;;;;;;;;;; 
 PlacePowerup
+;;;;;;;;;;;;;;;;;;;;;;;;
 
 mov ah , 0h ;
 int 16h ;
@@ -384,10 +410,10 @@ mov ah , 4ch ;
 int 21h;
 
 
-
-
 hlt
 main ENDP
+
+
 
 ; In order for this procedure to work you have to put in DX the OFFSET of your file name variable
 OpenFile PROC
@@ -470,7 +496,6 @@ DrawPiece     PROC  FAR ; To be noticed. May cause an error due to Jump Far
                     inc dx ;
                     cmp dx, [countY];
                     JNE piecesloop;
-
 RET
 DrawPiece   ENDP
 ;
@@ -574,12 +599,12 @@ RET;
 random ENDP
 
 Drawpowerup proc
-    mov bp, sp
-    ;LEA si , chessData
+    mov bp , sp
+    LEA si , chessData 
     mov cx , 30h ; 
-    ADD CX, [BP + 4] ;
+    ADD CX , [BP + 4] ;
     mov dx , [BP + 6] ;
-    mov ah, 0ch ;
+    mov ah , 0ch ;
 
     ADD CX, 19H
     MOV [countX], CX
@@ -592,9 +617,9 @@ Drawpowerup proc
     poweruploop :
                 mov al ,[si] ;
                 cmp al, 06h
-                jz NODRAW
+                jz PUDRAW
                 int 10h;
-                NODRAW: inc cx;
+                PUDRAW: inc cx;
                 inc si;
                 cmp cx , [countX];
                 JNE poweruploop ;
@@ -603,6 +628,7 @@ Drawpowerup proc
                 inc dx ;
                 cmp dx, [countY];
                 JNE poweruploop;
+   
 Ret;
 Drawpowerup ENDP
 
