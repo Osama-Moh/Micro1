@@ -2,16 +2,15 @@
 .model Small
 .stack 64
 .data
+chosenSquare    db     3cH ; 
+chosenSquareColor   DB  ? ; 
+numOfDirections         db      4 ; Procedure Rules sets those variables according to the piece
+ArrayOfDirections       db      1h, 0ffh, 7h, 0f7h ; Permissible moves for a piece
+ArrayOfRepetitions      db      0, 1, 0, 1
+GoToNext                db      1h
+NewSourceSquare         db      ?
+ColorCounter            dw      ?
 
-sourceSquare    db      0FFH ; square to be moved 
-destSquare      db      0FFH ; destination after movment 
-destX           dw        ? ; coordinates of destSquare 
-destY           dw        ?
-rowX            DW      ? ; coordinates SrcSquare 
-rowY            DW      ?
-sourceLocationInES     DW      ?
-
-Currentcolor    DW      ? 
 boardFile   db   'chess.bin', 0h; chess board 
 firstState  db   'board.txt', 0h; file contain all names of the pieces names 
 DIRECTORY       DB      'D:\Pieces',0h ; 
@@ -26,10 +25,15 @@ Pieces      DB    8h DUP(0), 0ffh DUP(0), 20h  ; empty 8 bytes , total 32* 8 -1 
 countX      DW    ?
 countY      DW    ?
 
-chosenSquare    db     3cH ; 
-chosenSquareColor   DB  ? ; 
+sourceSquare    db      0FFH ; square to be moved 
+destSquare      db      0FFH ; destination after movment 
+destX           dw        ? ; coordinates of destSquare 
+destY           dw        ?
+rowX            DW      ? ; coordinates SrcSquare 
+rowY            DW      ?
+sourceLocationInES     DW      ?
 
-
+Currentcolor    DW      ? 
 
 chessData db  9C40h dup(?); all pixels in the grid in the start 
 
@@ -168,7 +172,11 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
         cmp al, 0dh ; ENTER KEY Ascii Code ; 
         jnz Arrows ; if its is not clicked  jmp to Arrows (label below )
         ;starting to locate sourceSquare and DestSquare 
-        mov al, [sourceSquare] ; 
+        mov bl, [sourceSquare] ; 
+        ;mov bh, 0h ; Move Current Square to BX
+        ;cmp Squares[bx], 0h ; Check if it is empty. Don't select.
+        ;jz Arrows
+        mov al, bl ; The above part was added so, we added this statement
         cmp al, 0ffh ; if sourceSquare is 0ffh then it is not defined  yet  
         jnz Dest
         mov al, [chosenSquare] ; chosend Square will be changed every arrow move (also it appears below ) 
@@ -176,9 +184,16 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
         MOV CL, [chosenSquareColor] ; the color if the current rowX and rowY , it is changing also every arrow press
         MOV CH, 0H ;
         PUSH CX ; so it is contain the color of the background "before" the last drawSquare call 
+        mov cx, 0h
+        push dx
+        push cx
+        CALL ColorSelected
+        add sp, 2h
+        pop dx
         jmp Arrows
 
         Dest:   
+        ; CALL RULES -------------------------------------------
         mov al, [chosenSquare]  
         mov [destSquare], al ; setting desSquare after pressing the second ENTERKEY; 
         cmp al, [sourceSquare]; make sure SourceSquare not equal to DesSquare because the piece will be deleted if the ENTER is pressed twice on the same Square
@@ -531,4 +546,156 @@ mov bx , [filehandle];
 int 21h;
 RET ;
 closeFile ENDP;
+
+ColorSelected       PROC
+mov bp, sp
+
+mov si, [bp + 2] ; ONE IN THE STACK TO CHOOSE ENEMY ENCODING. WHITE = 0, BLACK = 1.
+mov [ColorCounter], 0h
+; Check by color. Remove comment.
+mov di, [rowX]
+push di
+mov di, [rowY]
+push di
+mov dl, [chosenSquareColor]
+mov dh, 0h
+push dx
+
+mov cl, [numOfDirections]
+mov bx, 0h
+CALL ConHundred
+
+BeginColoring:      mov ch, [ArrayOfDirections+bx]
+                    add ch, [sourceSquare]
+INDIRECTION:        mov al, ch
+                    mov ah, 0h
+                    mov di, ax
+                    mov al, [Squares+di]
+                    dec al
+                    mov dl, 10h
+                    div dl
+                    mov ah, 0h
+                    XOR ax, si
+                    cmp ax, 1h
+                    jz CONFIGURE
+
+                    push ax
+                    push si
+                    push bx
+                    push cx
+                    mov ax, di
+                    sub al, [sourceSquare] ; Can be Optimized
+                    mov ah, [ArrayOfDirections+bx]
+                    push ax
+                    CALL OUTOFBORDER
+                    add sp, 2h
+
+                    cmp [GoToNext], 0h
+                    jz RESCONFIGURE
+                    push di ; Problematic. Very Problematic.
+                    CALL SquaresCalculation
+                    CALL GetSquareColor
+                    add sp, 2h
+
+                    mov bx, [ColorCounter]
+                    mov di, OFFSET chessData + 9500h
+                    mov cl, [chosenSquareColor]
+                    mov [di+bx], cl
+
+                    mov al, [chosenSquareColor]
+                    mov ah, 0h
+                    push ax
+                    mov ax, 0c35h
+                    push ax
+                    CALL DrawSquare
+                    add sp, 4h
+
+                    pop cx
+                    pop bx
+                    pop si
+                    pop bp
+                    mov al, [ArrayOfRepetitions+bx]
+                    cmp al, 0h
+                    jz CONFIGURE
+                    mov ax, si
+                    XOR ax, 1h ; INVERT The Last bit of si
+                    cmp bp, ax
+                    jz CONFIGURE
+                    add ch, [ArrayOfDirections+bx]
+                    JMP INDIRECTION
+
+RESCONFIGURE:       pop cx
+                    pop bx
+                    pop si
+                    pop bp
+
+CONFIGURE:          inc bx
+                    mov ch, 0h
+                    cmp bx, cx
+                    jb BeginColoring
+
+
+pop dx
+mov [chosenSquareColor], dl
+pop di
+mov [rowY], di
+pop di
+mov [rowX], di
+RET
+ColorSelected ENDP
+
+OUTOFBORDER     PROC
+mov bp, sp
+
+mov dl, [NewSourceSquare]
+mov dh, 0h
+
+mov ax, [bp + 2] ; First Two Hexadecimal is Indicator. The Second are the actual move
+cmp ah, 1h
+jz NOINC
+cmp ah, 0ffh
+jz NOINC
+cmp al, 0h
+jg increment
+sub al, 2h
+increment: add al, 2h
+NOINC:      mov ah, 0h
+            add dx, ax
+            mov dh, 0h
+            cmp dx, 0bh
+            jb NO
+            cmp dx, 58h ; 88 decimal
+            ja NO
+            mov ax, dx
+            mov dx, 0h
+            mov bp, 0ah
+            div bp
+            cmp dx, 0h
+            jz NO
+            cmp dx, 09h
+            jz NO
+
+mov [GoToNext], 1h
+RET
+
+NO: mov [GoToNext], 0h
+RET
+OUTOFBORDER ENDP
+
+ConHundred      PROC
+
+mov al, [sourceSquare]
+mov ah, 0h
+mov dh, al
+mov dl, 08h
+div dl
+mov dl, 02h
+mul dl
+add dh, 0bh
+add dh, al
+mov [NewSourceSquare], dh
+
+RET
+ConHundred  ENDP
+
 End main
