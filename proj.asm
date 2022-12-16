@@ -29,6 +29,11 @@ countY      DW    ?
 chosenSquare    db     3cH ; 
 chosenSquareColor   DB  ? ; 
 
+m       db      64d
+a       db      25d
+b       dw      8d
+xo      db      30d
+rand    db      ?
 
 
 chessData db  9C40h dup(?); all pixels in the grid in the start 
@@ -79,6 +84,27 @@ DrawInitialState     MACRO
                     Jnz DrawPiecesLoop
 
 ENDM
+
+PlacePowerup    Macro   ;;this macro will be executed when the number of correct movements is equal to specific number
+    ;; it is call will be inside the movement process and it will have a value in the encoding to make the movement avaialble
+    Incorrect:
+    call random
+    cmp [rand],40H
+    JAE Incorrect
+    mov bl,rand
+    mov bh,0h        
+    cmp Squares[bx],0H
+    jnz Incorrect
+    
+    mov al,rand
+    mov ah,0h
+    push ax
+    call SquaresCalculation 
+    pop ax
+    Call Drawpowerup
+
+ENDM
+
 .code
 main PROC far
 mov ax , @data ;
@@ -130,6 +156,13 @@ DrawInitialState
 ;Waiting to Press ENTER Key to show flickering background 
 mov ah , 0h ;
 int 16h ;
+
+  
+PlacePowerup
+
+mov ah , 0h ;
+int 16h ;
+
 
 mov cl, [chosenSquare] ; it place where the flickers begins ; black king ;
 mov ch, 0h
@@ -342,17 +375,15 @@ POP DX
             add [chosenSquare], 1h ;  the number of square increase by 1h;  
             popA
             jmp MoveSquare;
-
             
-            
-
-
 ;mov ah , 0h ;
 ;mov al , 3h ;
 ;int 10h ;
 ; call interrup to terminate the program the return to OS 
 mov ah , 4ch ;
 int 21h;
+
+
 
 
 hlt
@@ -531,4 +562,48 @@ mov bx , [filehandle];
 int 21h;
 RET ;
 closeFile ENDP;
+
+random proc 
+   mov al,xo
+   mul a
+   add ax,b
+   div [m]
+   mov [rand],ah
+   mov xo,ah
+RET;
+random ENDP
+
+Drawpowerup proc
+    mov bp, sp
+    ;LEA si , chessData
+    mov cx , 30h ; 
+    ADD CX, [BP + 4] ;
+    mov dx , [BP + 6] ;
+    mov ah, 0ch ;
+
+    ADD CX, 19H
+    MOV [countX], CX
+    SUB CX, 19H
+
+    add dx, 19h
+    MOV [countY], dx
+    sub dx, 19h
+    
+    poweruploop :
+                mov al ,[si] ;
+                cmp al, 06h
+                jz NODRAW
+                int 10h;
+                NODRAW: inc cx;
+                inc si;
+                cmp cx , [countX];
+                JNE poweruploop ;
+                mov cx , [bp+4] ;
+                add cx, 30h
+                inc dx ;
+                cmp dx, [countY];
+                JNE poweruploop;
+Ret;
+Drawpowerup ENDP
+
 End main
