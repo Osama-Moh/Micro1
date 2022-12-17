@@ -7,9 +7,12 @@ chosenSquareColor   DB  ? ;
 numOfDirections         db      4 ; Procedure Rules sets those variables according to the piece
 ArrayOfDirections       db      1h, 0ffh, 7h, 0f7h ; Permissible moves for a piece
 ArrayOfRepetitions      db      0, 1, 0, 1
-GoToNext                db      1h
+RepetionCounter         db      1h
+GoToNext                db      1h ; To be removed
 NewSourceSquare         db      ?
 ColorCounter            dw      ?
+DirectionCounter        dw      ?
+Enemy                   dw      ?
 
 boardFile   db   'chess.bin', 0h; chess board 
 firstState  db   'board.txt', 0h; file contain all names of the pieces names 
@@ -551,8 +554,9 @@ ColorSelected       PROC
 mov bp, sp
 
 mov si, [bp + 2] ; ONE IN THE STACK TO CHOOSE ENEMY ENCODING. WHITE = 0, BLACK = 1.
+mov [Enemy], si
 mov [ColorCounter], 0h
-; Check by color. Remove comment.
+
 mov di, [rowX]
 push di
 mov di, [rowY]
@@ -563,6 +567,7 @@ push dx
 
 mov cl, [numOfDirections]
 mov bx, 0h
+mov [DirectionCounter], 0h
 CALL ConHundred
 
 BeginColoring:      mov ch, [ArrayOfDirections+bx]
@@ -575,13 +580,11 @@ INDIRECTION:        mov al, ch
                     mov dl, 10h
                     div dl
                     mov ah, 0h
-                    XOR ax, si
+                    XOR ax, [Enemy]
                     cmp ax, 1h
                     jz CONFIGURE
 
                     push ax
-                    push si
-                    push bx
                     push cx
                     mov ax, di
                     sub al, [sourceSquare] ; Can be Optimized
@@ -611,26 +614,24 @@ INDIRECTION:        mov al, ch
                     add sp, 4h
 
                     pop cx
-                    pop bx
-                    pop si
+                    mov bx, [DirectionCounter]
                     pop bp
                     mov al, [ArrayOfRepetitions+bx]
                     cmp al, 0h
                     jz CONFIGURE
-                    mov ax, si
-                    XOR ax, 1h ; INVERT The Last bit of si
-                    cmp bp, ax
+                    cmp bp, 0h
                     jz CONFIGURE
                     add ch, [ArrayOfDirections+bx]
+                    inc [RepetionCounter]
                     JMP INDIRECTION
 
 RESCONFIGURE:       pop cx
-                    pop bx
-                    pop si
                     pop bp
 
-CONFIGURE:          inc bx
+CONFIGURE:          inc [DirectionCounter]
+                    mov bx, [DirectionCounter]
                     mov ch, 0h
+                    mov [RepetionCounter], 1h
                     cmp bx, cx
                     jb BeginColoring
 
@@ -650,6 +651,11 @@ mov bp, sp
 mov dl, [NewSourceSquare]
 mov dh, 0h
 
+mov cl, [RepetionCounter]
+mov al, 2h
+mul cl
+mov cl, al
+
 mov ax, [bp + 2] ; First Two Hexadecimal is Indicator. The Second are the actual move
 cmp ah, 1h
 jz NOINC
@@ -657,8 +663,9 @@ cmp ah, 0ffh
 jz NOINC
 cmp al, 0h
 jg increment
-sub al, 2h
-increment: add al, 2h
+sub al, cl
+jmp NOINC
+increment: add al, cl
 NOINC:      mov ah, 0h
             add dx, ax
             mov dh, 0h
