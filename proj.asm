@@ -1,5 +1,5 @@
 .286
-.model Small
+.model small
 .stack 64
 .data
 isItWhite               db      0h ; 0h ->white ; 1h -> black;  
@@ -22,7 +22,7 @@ DIRECTORY       DB      'D:\Pieces',0h ;
 filehandle dw ?
 
 Squares     DB     07h, 05h, 03h, 02h, 01h, 04h, 06h, 08h, 09h, 0ah, 0bh, 0ch, 0dh, 0eh, 0fh, 10h ; pieces order in the .txt files 
-            DB     32 DUP(0h)
+            DB     10h ,29 DUP(0h), 19h , 10h 
             DB     19h, 1ah, 1bh, 1ch, 1dh, 1eh, 1fh, 20h, 17h, 15h, 13h, 12h, 11h, 14h, 16h, 18h 
 
 Pieces      DB    8h DUP(0), 0ffh DUP(0), 20h  ; empty 8 bytes , total 32* 8 -1 because each name have 8 bytes except the last one has 7 , 20h =32d ->number of pieace
@@ -196,7 +196,7 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
         MOV CL, [chosenSquareColor] ; the color if the current rowX and rowY , it is changing also every arrow press
         MOV CH, 0H ;
         PUSH CX ; so it is contain the color of the background "before" the last drawSquare call 
-        mov cx, 0h
+        mov cx, 0h;
         push dx
         push cx
         CALL ColorSelected
@@ -762,6 +762,18 @@ neg ah;
 neg ch;
 neg cl;
 SetTheArrays:
+push bx ;
+add bl , ah; 8h ;   
+cmp Squares[Bx] , 0h ;
+pop  bx;
+jnz setMoves;
+mov dl, [numOfDirections]; 
+mov dh ,0h ;
+mov di , dx;  
+mov ArrayOfDirections[di], ah; 
+mov ArrayOfRepetitions[di], 0h ; 
+inc [numOfDirections]; 
+;pop bx; 
 cmp [isItWhite] ,0h;
 jz White 
 cmp bl , 30h; 
@@ -775,17 +787,7 @@ jb setMoves;
 cmp bl , 0fh; 
 ja setMoves
 setInitial:
-add bl , ah; 8h ;   
-cmp Squares[Bx] , 0h ;
-jnz setMoves;
-push bx ;
-mov bl, [numOfDirections]; 
-mov bh ,0h ; 
-mov ArrayOfDirections[bx], ah; 
-mov ArrayOfRepetitions[bx], 0h ; 
-inc [numOfDirections]; 
-pop bx; 
-sub bl, ah ; 
+;sub bl, ah ; 
 add bl, al ;
 cmp Squares[bx], 0h ; 
 jnz setMoves; 
@@ -811,7 +813,8 @@ call CheckOpponent ;
 add sp ,2h ;
 popA
 ;dec [numOfDirections]; 
-NotPawn:
+NotPawn: 
+
 mov [isItWhite], 0h;  
 RET
 RULES ENDP
