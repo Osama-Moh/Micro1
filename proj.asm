@@ -2,6 +2,7 @@
 .model Small
 .stack 64
 .data
+isItWhite               db      0h ; 0h ->white ; 1h -> black;  
 chosenSquare    db     3cH ; 
 chosenSquareColor   DB  ? ; 
 numOfDirections         db      0h ; Procedure Rules sets those variables according to the piece
@@ -194,7 +195,7 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
         MOV CL, [chosenSquareColor] ; the color if the current rowX and rowY , it is changing also every arrow press
         MOV CH, 0H ;
         PUSH CX ; so it is contain the color of the background "before" the last drawSquare call 
-        mov cx, 0h
+        mov cx, 1h
         push dx
         push cx
         CALL ColorSelected
@@ -723,169 +724,119 @@ RET
 ConHundred  ENDP
 
 RULES proc
-;Pawn ; 9h to 10h --> white pawn ;
-; CASES to handle -> Intial State if(white) 2 squares down; 
- mov si , 0h ; 
- mov bl , [chosenSquare] ; 
- mov bh , 0h; 
- mov dl , Squares[bx]; 
- cmp dl , 9h; 
- JB NotWhitePawn; not a  white pawn in intial state   
- cmp dl , 10h; 
- JA NotWhitePawn;
- cmp bx , 8h ;  
- jb NotWhiteInitial 
- cmp bx , 0fh; 15d ;
- JA NotWhiteInitial;  
- ; check first square + 8h
- ;mov [Enemy] , 0h; 
- add bx , 8h ;  
- mov cl , Squares[bx];  
- cmp cl , 0h;
- jnz Next; 
- mov ArrayOfDirections[si] , 08h; move down; 
- mov ArrayOfRepetitions[si] , 0h; 
- inc si ;
- add bx ,8h;  
- mov cl , Squares[bx]; 
- cmp cl , 0h; 
- jnz Next ; 
- mov ArrayOfDirections[si] , 10h; 16d ; 
- mov ArrayOfRepetitions[si], 0h;
- inc si 
- Next:  mov bl ,[chosenSquare]
-        mov bh, 0h; 
-        add bl, 07h ;  ; check +7 square 
-        mov cl, Squares[bx];  
-        cmp cl , 0h ;  
-        jz checkdiagonal; + 9 
-        mov ArrayOfDirections[si] , 07h; 
-        mov ArrayOfRepetitions[si], 0h;
-        inc si; 
-        checkdiagonal: sub bl , 07h ; 
-        add bl ,09h ;
-        mov cl , Squares[bx];
-        sub bl, 09h;   
-        cmp cl , 0h;  
-        jz QuitPawn;
-        mov ArrayOfDirections[si] , 09h; 
-        mov ArrayOfRepetitions[si], 0h;
-        inc si;  
-        jmp QuitPawn        
-NotWhiteInitial:
-    mov bl ,[chosenSquare]
-    mov bh, 0h; 
-    add bx , 8h ;  
-    mov cl , Squares[bx];  
-    cmp cl , 0h;
-    jnz checkD1 ; check diagonal 1 + 7h ;
-    mov ArrayOfDirections[si] , 08h; move down; 
-    mov ArrayOfRepetitions[si] , 0h; 
-    inc si ;
-    checkD1:
-        mov bl ,[chosenSquare]
-        mov bh, 0h; 
-        add bl, 07h ;  ; check +7 square 
-        mov cl, Squares[bx];  
-        cmp cl , 0h ;  
-        jz checkD2; + 9 
-        mov ArrayOfDirections[si] , 07h; 
-        mov ArrayOfRepetitions[si], 0h;
-        inc si; 
-        checkD2: sub bl , 07h ; 
-        add bl ,09h ;
-        mov cl , Squares[bx];
-        sub bl, 09h;   
-        cmp cl , 0h;  
-        jz QuitPawn;
-        mov ArrayOfDirections[si] , 09h; 
-        mov ArrayOfRepetitions[si], 0h;
-        inc si;  
-        jmp QuitPawn
-NotWhitePawn: ; start checking black ; 
-    mov bl , [chosenSquare] ; 
-    mov bh , 0h; 
-    mov dl , Squares[bx]; 
-    cmp dl , 19h; 
-    JB QuitPawn;   
-    cmp dl , 20h; 
-    JA QuitPawn;
-    cmp bx , 30h ;  
-    jb NotBlackInitial 
-    cmp bx , 37h; 55d ;
-    JA NotBlackInitial;  
-    ; check first square + 8h
-    ;mov [Enemy] , 0h; 
-    sub bx , 8h ;  
-    mov cl , Squares[bx];  
-    cmp cl , 0h;
-    jnz Next2; 
-    mov ArrayOfDirections[si] , 0F8h; move up; 
-    mov ArrayOfRepetitions[si] , 0h; 
-    inc si ;
-    sub bx ,8h;  
-    mov cl , Squares[bx]; 
-    cmp cl , 0h; 
-    jnz Next2 ; 
-    mov ArrayOfDirections[si] , 0F0h; 16d ; 
-    mov ArrayOfRepetitions[si], 0h;
-    inc si 
-    Next2:  mov bl ,[chosenSquare]
-           mov bh, 0h; 
-           sub bl, 07h ;  ; check +7 square 
-           mov cl, Squares[bx];  
-           cmp cl , 0h ;  
-           jz checkBdiagonal; + 9 ; check black diagonal  
-           mov ArrayOfDirections[si] , 0f9h; -7d  
-           mov ArrayOfRepetitions[si], 0h;
-           inc si; 
-           checkBdiagonal: add bl , 07h ; 
-           sub bl ,09h ;
-           mov cl , Squares[bx];
-           sub bl, 09h;   
-           cmp cl , 0h;  
-           jz QuitPawn;
-           mov ArrayOfDirections[si] , 0f7h; -9d ; 
-           mov ArrayOfRepetitions[si], 0h;
-           inc si;  
-           jmp QuitPawn        
-NotBlackInitial:
-    mov bl ,[chosenSquare]
-    mov bh, 0h; 
-    sub bx , 8h ;  
-    mov cl , Squares[bx];  
-    cmp cl , 0h;
-    jnz checkBD1 ; check black diagonal 1 - 7h ;
-    mov ArrayOfDirections[si] , 0F8h; move down; 
-    mov ArrayOfRepetitions[si] , 0h; 
-    inc si ;
-    checkBD1:
-        mov bl ,[chosenSquare]
-        mov bh, 0h; 
-        sub bl, 07h ;  ; check +7 square 
-        mov cl, Squares[bx];   
-        cmp cl , 0h ;  
-        jz checkBD2; + 9 
-        mov ArrayOfDirections[si] ,  0f9h; 
-        mov ArrayOfRepetitions[si], 0h;
-        inc si; 
-        checkBD2: add bl , 07h ; 
-        sub bl ,09h ;
-        mov cl , Squares[bx];
-        add bl, 09h;   
-        cmp cl , 0h;  
-        jz QuitPawn;
-        mov ArrayOfDirections[si] , 0f7h; 
-        mov ArrayOfRepetitions[si], 0h;
-        inc si;  
-        jmp QuitPawn            
-QuitPawn:
-mov cx , si ;
-mov [numOfDirections], cl;
-;Start second
-
-
+; ah ; Up/Down +8 ; al ; Up/Down + 16 ;
+; ch ; Diagonal ; +7 , -7h; 
+; cl ; Diagonal ; +9 , -9h; 
+mov ah , 8h ;
+mov al , 10h;  
+mov ch , 7h;
+mov cl , 9h;   
+mov [numOfDirections] , 0h  ; 
+mov bl , [chosenSquare] ; 
+mov bh , 0h; 
+mov dl , Squares[bx]; 
+cmp dl , 9h; 
+Jb checkBlack
+cmp dl , 10h;  
+jA checkBlack; 
+jmp SetTheArrays; 
+checkBlack: 
+cmp dl , 19h ; 
+jB NotPawn; 
+cmp dl , 20h; 
+jA NotPawn;
+mov [isItWhite] , 1h; 
+neg al;
+neg ah;
+neg ch;
+neg cl;
+SetTheArrays:
+cmp [isItWhite] ,0h;
+jz White 
+cmp bl , 30h; 
+jb SetMoves
+cmp bl , 37h; 
+ja SetMoves; 
+jmp setInitial
+White:
+cmp bl , 8h ;  
+jb setMoves; 
+cmp bl , 0fh; 
+ja setMoves
+setInitial:
+add bl , ah; 8h ;   
+cmp Squares[Bx] , 0h ;
+jnz setMoves;
+push bx ;
+mov bl, [numOfDirections]; 
+mov bh ,0h ; 
+mov ArrayOfDirections[bx], ah; 
+mov ArrayOfRepetitions[bx], 0h ; 
+inc [numOfDirections]; 
+pop bx; 
+sub bl, ah ; 
+add bl, al ;
+cmp Squares[bx], 0h ; 
+jnz setMoves; 
+push bx ;
+mov bl, [numOfDirections]; 
+mov bh ,0h ; 
+mov ArrayOfDirections[bx], al; 
+mov ArrayOfRepetitions[bx], 0h ; 
+inc [numOfDirections]; 
+pop bx; 
+SetMoves:   
+pushA 
+mov ch , 0h ;  
+push cx ; 
+call CheckOpponent; 
+add sp ,2h ;
+popA
+pushA 
+xchg cl , ch ;
+mov ch , 0h ; 
+push cx ; 
+call CheckOpponent ; 
+add sp ,2h ;
+popA
+;dec [numOfDirections]; 
+NotPawn: 
 RET
 RULES ENDP
 
+CheckOpponent proc ;; push the direction diagonal   
+mov bp , sp ; 
+mov cx , [bp+2]; direction 
+mov bl , [chosenSquare]; 
+mov bh, 0h ; 
+add bx , cx ; bx contain the new direction 
+mov bh , 0h ;
+cmp [isItWhite] , 0h ;  
+jnz Blackcheck ;
+mov dl , Squares[bx];  
+cmp dl , 11h;  
+jb NoMove
+cmp dl , 20h; 
+jA NoMove; 
+mov dl, [numOfDirections];
+mov dh ,0h;
+mov si , dx ; 
+mov ArrayOfDirections[si] , cl; 
+mov ArrayOfRepetitions[si],  0h ;
+inc [numOfDirections]; 
+Blackcheck:
+mov dl , Squares[bx];  
+cmp dl , 10h;  
+jA NoMove
+cmp dl , 1h ;
+jb NoMove
+mov dl, [numOfDirections];
+mov dh ,0h;
+mov si , dx ;  
+mov ArrayOfDirections[si] , cl; 
+mov ArrayOfRepetitions[si],  0h ;
+inc [numOfDirections]; 
+NoMove:
+RET 
+CheckOpponent endp 
 End main
