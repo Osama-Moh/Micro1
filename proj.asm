@@ -196,7 +196,7 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
         MOV CL, [chosenSquareColor] ; the color if the current rowX and rowY , it is changing also every arrow press
         MOV CH, 0H ;
         PUSH CX ; so it is contain the color of the background "before" the last drawSquare call 
-        mov cx, 1h
+        mov cx, 0h
         push dx
         push cx
         CALL ColorSelected
@@ -811,7 +811,8 @@ call CheckOpponent ;
 add sp ,2h ;
 popA
 ;dec [numOfDirections]; 
-NotPawn: 
+NotPawn:
+mov [isItWhite], 0h;  
 RET
 RULES ENDP
 
