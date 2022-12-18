@@ -13,6 +13,7 @@ NewSourceSquare         db      ?
 ColorCounter            dw      ?
 DirectionCounter        dw      ?
 Enemy                   dw      ?
+DESELECT                db      0h
 
 boardFile   db   'chess.bin', 0h; chess board 
 firstState  db   'board.txt', 0h; file contain all names of the pieces names 
@@ -606,19 +607,29 @@ INDIRECTION:        mov al, ch
                     jz RESCONFIGURE
                     push di ; Problematic. Very Problematic.
                     CALL SquaresCalculation
-                    CALL GetSquareColor
                     add sp, 2h
+                    cmp [DESELECT], 1h
+                    jz DESELECTLBL
+                    CALL GetSquareColor
 
                     mov bx, [ColorCounter]
                     mov di, OFFSET chessData + 9500h
-                    mov cl, [chosenSquareColor]
-                    mov [di+bx], cl
-
                     mov al, [chosenSquareColor]
+                    mov [di+bx], al
+                    inc [ColorCounter]
+
                     mov ah, 0h
-                    push ax
-                    mov ax, 0c35h
-                    push ax
+                    mov bx, 0c35h
+                    jmp DRAW
+
+                    DESELECTLBL: mov ax, 35h
+                              mov si, [ColorCounter]
+                              mov bl, [chessData+9500h+si]
+                              mov bh, 0ch
+                              inc [ColorCounter]
+
+                    DRAW: push ax
+                    push bx
                     CALL DrawSquare
                     add sp, 4h
 
