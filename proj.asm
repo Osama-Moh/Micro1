@@ -2,6 +2,7 @@
 .model small
 .stack 64
 .data
+ArrayOfMoves            db      55h DUP(?)
 isItWhite               db      0h ; 0h ->white ; 1h -> black;  
 chosenSquare    db     3cH ; 
 chosenSquareColor   DB  ? ; 
@@ -18,11 +19,12 @@ DESELECT                db      0h
 
 boardFile   db   'chess.bin', 0h; chess board 
 firstState  db   'board.txt', 0h; file contain all names of the pieces names 
+MovesFile   db   'moves.txt', 0h; file that contains moves
 DIRECTORY       DB      'D:\Pieces',0h ; 
 filehandle dw ?
 
 Squares     DB     07h, 05h, 03h, 02h, 01h, 04h, 06h, 08h, 09h, 0ah, 0bh, 0ch, 0dh, 0eh, 0fh, 10h ; pieces order in the .txt files 
-            DB     10h ,29 DUP(0h), 19h , 10h 
+            DB     0bh DUP(0), 15h, 20 DUP(0h)
             DB     19h, 1ah, 1bh, 1ch, 1dh, 1eh, 1fh, 20h, 17h, 15h, 13h, 12h, 11h, 14h, 16h, 18h 
 
 Pieces      DB    8h DUP(0), 0ffh DUP(0), 20h  ; empty 8 bytes , total 32* 8 -1 because each name have 8 bytes except the last one has 7 , 20h =32d ->number of pieace
@@ -86,6 +88,46 @@ DrawInitialState     MACRO
 
                     cmp bx, 03fh ; each the last square 
                     Jnz DrawPiecesLoop
+
+    
+    mov ax, OFFSET MovesFile
+    mov bx, 0a5h ; 165 byte to be read
+    mov cx, OFFSET chessData
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    CALL HandleFile
+    add sp, 6h
+
+    mov si, 0h
+    mov bx, 0h
+    mov cl, 0ah
+    mov di, 05h
+
+    ParseMoves:     mov dl, [chessData+si]
+                    sub dl, 30h
+                    mov [ArrayOfMoves+bx], dl
+                    mov ch, 0h
+                    inc bx
+                    inc si
+    MovesLoop:      sub [chessData+si], 30h
+                    sub [chessData+si+1], 30h
+                    mov al, [chessData+si+1]
+                    mul cl
+                    add al, [chessData+si+2]
+                    sub al, 30h
+                    mov ah, [chessData+si]
+                    cmp [chessData+si+3], 'A'
+                    jnz CONTINUELooping
+                    NEG al
+                    CONTINUELooping:    mov WORD PTR [ArrayOfMoves+bx], ax
+                    add bx, 2h
+                    add si, 4h
+                    inc ch
+                    cmp ch, 8h
+                    jnz MovesLoop
+                    dec di
+                    jnz ParseMoves
 
 ENDM
 .code
@@ -188,20 +230,14 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
         mov al, bl ; The above part was added so, we added this statement
         cmp al, 0ffh ; if sourceSquare is 0ffh then it is not defined  yet  
         jnz Dest
-        mov al, [chosenSquare] ; chosend Square will be changed every arrow move (also it appears below )
-        pushA;
-        CALL RULES
-        popA;  
+        mov al, [chosenSquare] ; chosend Square will be changed every arrow move (also it appears below ) 
         mov [sourceSquare], al ; make sourceSquare equal to chosenSquare ,so when enter is pressed sourceSquare will be the chosenSquare 
+        push dx;
+        CALL RULES
+        pop dx; 
         MOV CL, [chosenSquareColor] ; the color if the current rowX and rowY , it is changing also every arrow press
         MOV CH, 0H ;
         PUSH CX ; so it is contain the color of the background "before" the last drawSquare call 
-        mov cx, 0h;
-        push dx
-        push cx
-        CALL ColorSelected
-        add sp, 2h
-        pop dx
         jmp Arrows
 
         Dest:   
@@ -562,10 +598,7 @@ RET ;
 closeFile ENDP;
 
 ColorSelected       PROC
-mov bp, sp
 
-mov si, [bp + 2] ; ONE IN THE STACK TO CHOOSE ENEMY ENCODING. WHITE = 0, BLACK = 1.
-mov [Enemy], si
 mov [ColorCounter], 0h
 
 mov di, [rowX]
@@ -591,7 +624,7 @@ INDIRECTION:        mov al, ch
                     mov dl, 10h
                     div dl
                     mov ah, 0h
-                    XOR ax, [Enemy]
+                    XOR al, [isItWhite]
                     cmp ax, 1h
                     jz CONFIGURE
 
@@ -679,11 +712,11 @@ mov cl, al
 
 mov ax, [bp + 2] ; First Two Hexadecimal is Indicator. The Second are the actual move
 cmp al , 10h;   34an lao 2ayz 27rk el +16 to move down or up PAWN
-jnz skip;
+ja skip;
 add al ,2h; 
 skip:
-cmp al ,0f0h  ; -16 ; 
-jnz skip2 
+cmp al ,0f1h  ; -16 ; 
+jl skip2 
 sub al , 2h; 
 skip2:
 cmp ah, 1h
@@ -753,9 +786,9 @@ jA checkBlack;
 jmp SetTheArrays; 
 checkBlack: 
 cmp dl , 19h ; 
-jB NotPawn; 
+jB NotPawnButBlack; 
 cmp dl , 20h; 
-jA NotPawn;
+jA NotPawnButBlack;
 mov [isItWhite] , 1h; 
 neg al;
 neg ah;
@@ -812,8 +845,34 @@ push cx ;
 call CheckOpponent ; 
 add sp ,2h ;
 popA
+jmp SELECT
 ;dec [numOfDirections]; 
-NotPawn: 
+NotPawnButBlack:    sub dl, 10h
+                    mov [isItWhite], 1h
+NotPawn:        mov al, dl
+                mov ah, 0h
+                mov cl, 2h
+                div cl
+                jz KING
+                add al, ah
+                KING:   mov cl, 11h; 17 bytes. One for count. Rest is for moves.
+                mul cl
+                mov bx, ax
+                mov al, [ArrayOfMoves+bx]
+                mov [numOfDirections], al
+                inc bx
+mov di, ax
+dec di
+LOADMOVES:      mov cx, WORD PTR [ArrayOfMoves+bx]
+                mov [ArrayOfDirections+di], cl
+                mov [ArrayOfRepetitions+di], ch
+                add bx, 2h
+                dec di
+                jns LOADMOVES
+   
+SELECT:     xor [isItWhite], 1h
+            CALL ColorSelected
+
 
 mov [isItWhite], 0h;  
 RET
