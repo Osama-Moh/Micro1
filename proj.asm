@@ -7,8 +7,8 @@ isItWhite               db      0h ; 0h ->white ; 1h -> black;
 chosenSquare    db     3cH ; 
 chosenSquareColor   DB  ? ; 
 numOfDirections         db      0h ; Procedure Rules sets those variables according to the piece
-ArrayOfDirections       db      8 dup(?) ; Permissible moves for a piece
-ArrayOfRepetitions      db      8 dup(?) ;
+ArrayOfDirections       db      8 dup(0h), 0h ; Permissible moves for a piece
+ArrayOfRepetitions      db      8 dup(0h), 0h ;
 RepetionCounter         db      1h
 GoToNext                db      1h ; To be removed
 NewSourceSquare         db      ?
@@ -24,7 +24,7 @@ DIRECTORY       DB      'D:\Pieces',0h ;
 filehandle dw ?
 
 Squares     DB     07h, 05h, 03h, 02h, 01h, 04h, 06h, 08h, 09h, 0ah, 0bh, 0ch, 0dh, 0eh, 0fh, 10h ; pieces order in the .txt files 
-            DB     0bh DUP(0), 15h, 20 DUP(0h)
+            DB     32 DUP(0h)
             DB     19h, 1ah, 1bh, 1ch, 1dh, 1eh, 1fh, 20h, 17h, 15h, 13h, 12h, 11h, 14h, 16h, 18h 
 
 Pieces      DB    8h DUP(0), 0ffh DUP(0), 20h  ; empty 8 bytes , total 32* 8 -1 because each name have 8 bytes except the last one has 7 , 20h =32d ->number of pieace
@@ -230,7 +230,7 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
         mov al, bl ; The above part was added so, we added this statement
         cmp al, 0ffh ; if sourceSquare is 0ffh then it is not defined  yet  
         jnz Dest
-        mov al, [chosenSquare] ; chosend Square will be changed every arrow move (also it appears below ) 
+        ChangeSelected: mov al, [chosenSquare] ; chosend Square will be changed every arrow move (also it appears below ) 
         mov [sourceSquare], al ; make sourceSquare equal to chosenSquare ,so when enter is pressed sourceSquare will be the chosenSquare 
         push dx;
         CALL RULES
@@ -242,12 +242,40 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
 
         Dest:   
         ; CALL RULES -------------------------------------------
-       
-        
-        mov al, [chosenSquare]  
+        mov [DESELECT], 1H
+        cmp [chosenSquareColor], 35h
+        jz GoToDest
+        mov bl, [chosenSquare]
+        mov bh, 0h
+        cmp [Squares+bx], 0h
+        jz IMPDES
+        MOV AL, [Squares+bx]
+        CMP [Squares+BX], al
+        mov ah, 0h
+        shl ax, 4H
+        XOR ah, [isItWhite]
+        jnz selectNewPiece
+        IMPDES: CALL ColorSelected
+                MOV [sourceSquare], 0FFH
+                JMP Arrows
+        selectNewPiece: CALL ColorSelected
+                        jmp ChangeSelected
+        GoToDest:   mov al, [chosenSquare]  
         mov [destSquare], al ; setting desSquare after pressing the second ENTERKEY; 
         cmp al, [sourceSquare]; make sure SourceSquare not equal to DesSquare because the piece will be deleted if the ENTER is pressed twice on the same Square
         jz Arrows; jmp arrows if srcsqare == destsquare
+            ;Update Square ; 
+        push bx 
+        push cx 
+        mov ch , 0h ;
+        mov bh , 0h ;
+        mov bl , [sourceSquare] ;
+        mov cl , Squares[bx]
+        mov Squares[bx] , 0h;
+        mov bl ,[destSquare]
+        mov Squares[bx] , cl ;   
+        pop cx ;
+        pop bx ;
         ; we are going to use Extra segment to to write to screen directly withtout using interupt 
         push dx ; color that is drawn in the last drawSquare call ; 
         mov ax, 0a000h ;  adress of graphics part in extra segment 
@@ -336,6 +364,7 @@ mov [rowX], ax
 mov ax, [destY]
 sub ax, 30h
 mov [rowY], ax
+CALL ColorSelected
 mov [sourceSquare], 0ffh
 mov [destSquare], 0ffh
 POP DX
@@ -605,9 +634,6 @@ mov di, [rowX]
 push di
 mov di, [rowY]
 push di
-mov dl, [chosenSquareColor]
-mov dh, 0h
-push dx
 
 mov cl, [numOfDirections]
 mov bx, 0h
@@ -625,10 +651,14 @@ INDIRECTION:        mov al, ch
                     div dl
                     mov ah, 0h
                     XOR al, [isItWhite]
+                    CMP [DESELECT], 1H
+                    JZ CONTINUEdrawing
                     cmp ax, 1h
-                    jz CONFIGURE
+                    jnz CONTINUEdrawing
+                    cmp [ArrayOfDirections+bx], 0h
+                    jnz CONFIGURE
 
-                    push ax
+                    CONTINUEdrawing:    push ax
                     push cx
                     mov ax, di
                     sub al, [sourceSquare] ; Can be Optimized
@@ -690,8 +720,7 @@ CONFIGURE:          inc [DirectionCounter]
                     jb BeginColoring
 
 
-pop dx
-mov [chosenSquareColor], dl
+mov [chosenSquareColor], 35h
 pop di
 mov [rowY], di
 pop di
@@ -711,12 +740,12 @@ mul cl
 mov cl, al
 
 mov ax, [bp + 2] ; First Two Hexadecimal is Indicator. The Second are the actual move
-cmp al , 10h;   34an lao 2ayz 27rk el +16 to move down or up PAWN
-ja skip;
+cmp ah , 0fh;   34an lao 2ayz 27rk el +16 to move down or up PAWN
+jl skip;
 add al ,2h; 
 skip:
-cmp al ,0f1h  ; -16 ; 
-jl skip2 
+cmp ah ,0f1h  ; -16 ; 
+jg skip2  
 sub al , 2h; 
 skip2:
 cmp ah, 1h
@@ -771,20 +800,24 @@ RULES proc
 ; ah ; Up/Down +8 ; al ; Up/Down + 16 ;
 ; ch ; Diagonal ; +7 , -7h; 
 ; cl ; Diagonal ; +9 , -9h; 
+mov [isItWhite], 0h;  
+mov bl , [chosenSquare] ; 
+mov bh , 0h; 
+cmp Squares[bx], 0h ;
+jz Quit 
 mov ah , 8h ;
 mov al , 10h;  
 mov ch , 7h;
 mov cl , 9h;   
 mov [numOfDirections] , 0h  ; 
-mov bl , [chosenSquare] ; 
-mov bh , 0h; 
 mov dl , Squares[bx]; 
 cmp dl , 9h; 
-Jb checkBlack
+Jb checkBlackOrNotWhitePawn
 cmp dl , 10h;  
-jA checkBlack; 
+jA checkBlackOrNotWhitePawn; 
 jmp SetTheArrays; 
-checkBlack: 
+checkBlackOrNotWhitePawn: cmp dl, 9h
+                          jb NotPawn
 cmp dl , 19h ; 
 jB NotPawnButBlack; 
 cmp dl , 20h; 
@@ -853,6 +886,7 @@ NotPawn:        mov al, dl
                 mov ah, 0h
                 mov cl, 2h
                 div cl
+                cmp al, 0h
                 jz KING
                 add al, ah
                 KING:   mov cl, 11h; 17 bytes. One for count. Rest is for moves.
@@ -871,10 +905,10 @@ LOADMOVES:      mov cx, WORD PTR [ArrayOfMoves+bx]
                 jns LOADMOVES
    
 SELECT:     xor [isItWhite], 1h
+            MOV [DESELECT], 0H
+            inc [numOfDirections]
             CALL ColorSelected
-
-
-mov [isItWhite], 0h;  
+Quit: 
 RET
 RULES ENDP
 
