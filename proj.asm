@@ -232,12 +232,12 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
         jnz Dest
         ChangeSelected: mov al, [chosenSquare] ; chosend Square will be changed every arrow move (also it appears below ) 
         mov [sourceSquare], al ; make sourceSquare equal to chosenSquare ,so when enter is pressed sourceSquare will be the chosenSquare 
-        push dx;
-        CALL RULES
-        pop dx; 
         MOV CL, [chosenSquareColor] ; the color if the current rowX and rowY , it is changing also every arrow press
         MOV CH, 0H ;
         PUSH CX ; so it is contain the color of the background "before" the last drawSquare call 
+        push dx;
+        CALL RULES
+        pop dx; 
         jmp Arrows
 
         Dest:   
@@ -264,9 +264,10 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
         mov [destSquare], al ; setting desSquare after pressing the second ENTERKEY; 
         cmp al, [sourceSquare]; make sure SourceSquare not equal to DesSquare because the piece will be deleted if the ENTER is pressed twice on the same Square
         jz Arrows; jmp arrows if srcsqare == destsquare
-            ;Update Square ; 
+            ;Update Square ;
         push bx 
         push cx 
+        CALL ColorSelected
         mov ch , 0h ;
         mov bh , 0h ;
         mov bl , [sourceSquare] ;
@@ -364,7 +365,6 @@ mov [rowX], ax
 mov ax, [destY]
 sub ax, 30h
 mov [rowY], ax
-CALL ColorSelected
 mov [sourceSquare], 0ffh
 mov [destSquare], 0ffh
 POP DX
@@ -651,8 +651,6 @@ INDIRECTION:        mov al, ch
                     div dl
                     mov ah, 0h
                     XOR al, [isItWhite]
-                    CMP [DESELECT], 1H
-                    JZ CONTINUEdrawing
                     cmp ax, 1h
                     jnz CONTINUEdrawing
                     cmp [ArrayOfDirections+bx], 0h
@@ -690,6 +688,11 @@ INDIRECTION:        mov al, ch
                               mov si, [ColorCounter]
                               mov bl, [chessData+9500h+si]
                               mov bh, 0ch
+                              pop cx
+                              cmp ch, [destSquare]
+                              jnz ContinueDehk
+                              mov [chosenSquareColor], bl
+                              ContinueDehk:   push cx
                               inc [ColorCounter]
 
                     DRAW: push ax
@@ -719,9 +722,10 @@ CONFIGURE:          inc [DirectionCounter]
                     cmp bx, cx
                     jb BeginColoring
 
-
+cmp [DESELECT], 1h
+jz RESETLBL
 mov [chosenSquareColor], 35h
-pop di
+RESETLBL:  pop di
 mov [rowY], di
 pop di
 mov [rowX], di
@@ -740,6 +744,8 @@ mul cl
 mov cl, al
 
 mov ax, [bp + 2] ; First Two Hexadecimal is Indicator. The Second are the actual move
+cmp ah, 0h
+jz YES
 cmp ah , 0fh;   34an lao 2ayz 27rk el +16 to move down or up PAWN
 jl skip;
 add al ,2h; 
@@ -773,7 +779,7 @@ NOINC:      mov ah, 0h
             cmp dx, 09h
             jz NO
 
-mov [GoToNext], 1h
+YES:   mov [GoToNext], 1h
 RET
 
 NO: mov [GoToNext], 0h
@@ -904,7 +910,11 @@ LOADMOVES:      mov cx, WORD PTR [ArrayOfMoves+bx]
                 dec di
                 jns LOADMOVES
    
-SELECT:     xor [isItWhite], 1h
+SELECT:     mov bl, [numOfDirections]
+            mov bh, 0h
+            mov [ArrayOfDirections+bx], 0h
+            mov [ArrayOfRepetitions+bx], 0h
+            xor [isItWhite], 1h
             MOV [DESELECT], 0H
             inc [numOfDirections]
             CALL ColorSelected
