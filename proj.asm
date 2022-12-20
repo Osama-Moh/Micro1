@@ -41,6 +41,7 @@ rowY            DW      ?
 sourceLocationInES     DW      ?
 
 Currentcolor    DW      06h 
+sourceSquareColor   dw      ?
 
 chessData db  9C40h dup(?); all pixels in the grid in the start 
 
@@ -254,14 +255,12 @@ GAME:     mov dx, [Currentcolor] ; color in the dx ;
         mov [sourceSquare], al ; make sourceSquare equal to chosenSquare ,so when enter is pressed sourceSquare will be the chosenSquare 
         RevertFlickering
         MOV CL, [chosenSquareColor] ; the color if the current rowX and rowY , it is changing also every arrow press
-        MOV CH, 0H ;
-        PUSH CX ; so it is contain the color of the background "before" the last drawSquare call 
-        push dx;
+        mov ch, 0h
+        MOV [sourceSquareColor], cx ;
         CALL RULES
         mov cl, [chosenSquareColor]
         mov ch, 0h
         mov [Currentcolor], cx
-        pop dx; 
         jmp Arrows
 
         Dest:   
@@ -289,8 +288,6 @@ GAME:     mov dx, [Currentcolor] ; color in the dx ;
         cmp al, [sourceSquare]; make sure SourceSquare not equal to DesSquare because the piece will be deleted if the ENTER is pressed twice on the same Square
         jz Arrows; jmp arrows if srcsqare == destsquare
             ;Update Square ;
-        push bx 
-        push cx 
         CALL ColorSelected
         mov ch , 0h ;
         mov bh , 0h ;
@@ -299,10 +296,7 @@ GAME:     mov dx, [Currentcolor] ; color in the dx ;
         mov Squares[bx] , 0h;
         mov bl ,[destSquare]
         mov Squares[bx] , cl ;   
-        pop cx ;
-        pop bx ;
         ; we are going to use Extra segment to to write to screen directly withtout using interupt 
-        push dx ; color that is drawn in the last drawSquare call ; 
         mov ax, 0a000h ;  adress of graphics part in extra segment 
         mov es, ax ;
         mov ax, [rowX] ; 
@@ -335,9 +329,7 @@ GAME:     mov dx, [Currentcolor] ; color in the dx ;
         add ax, bx
         mov [sourceLocationInES], ax ; sourceLocationInES know holds the offset of the Sourcesquare pixel 
         
-        pop dx ; number of sourceSquare ;
-        pop cx ; color of the background 
-        push dx ; ; 
+        mov cx, [sourceSquareColor] ; color of the background 
         mov si, cx ; si color of the background  
         
         mov bl, 0h ; counter for the coloumns 
@@ -391,17 +383,15 @@ sub ax, 30h
 mov [rowY], ax
 mov [sourceSquare], 0ffh
 mov [destSquare], 0ffh
-POP DX
 
 ;;;;;;;;;;;;;;;;;;;;;; arrows Movement , this part is responsible for moving the flickering square in the gird 
-                    Arrows: pushA  ; pushing all before starting 
-                    mov ah,01h; 
+                    Arrows:  mov ah,01h; 
                     int 16h; check if any key is pressed 
                     jz Nopress
                     mov ah,0h  ; empty the buffer if the key is pressed 
                     int 16h
                     jmp handlearrows
-                    Nopress: POPA   
+                    Nopress: 
                     ;;;;
                     JMP GAME
             Handlearrows: ; is just checking if it is Currentcolor of the square is the same as flickering color ; Before moving i need to reset it to the original backgrnd color 
@@ -417,7 +407,6 @@ POP DX
                           cmp ah , 4Bh;  ascii for left 
                           jz LEFT;
                         exit:
-                          popA; 
                           jmp MoveSquare;   
             ; in this part , i just move rowX and rowY variables according to the key pressed , also i make sure that the flickering color is not getting out of the grid 
             ; also i change the  chosenSquare number becuause it will be used again ;  
@@ -426,28 +415,24 @@ POP DX
             jz exit ; 
             sub [rowX],19h; 25 pixel up 
             sub [chosenSquare], 8h ; the number decrease by 8h; 
-            popA
             jmp MoveSquare;
             DOWN:
             cmp [rowX] , 0B0h;
             jz exit 
             add [rowX],19h;
             add [chosenSquare], 8h; the number of square increase by 8h;  
-            popA
             jmp MoveSquare;
             LEFT :
             cmp [rowY] ,00h ; 
             jz exit ;
             sub [rowY],19h;
             sub [chosenSquare], 1h ;the number of square decrement by 1h;  
-            popA
             jmp MoveSquare;
             RIGHT:
             cmp[rowY] ,  0AFh; 
             jz exit
             add [rowY],19h;
             add [chosenSquare], 1h ;  the number of square increase by 1h;  
-            popA
             jmp MoveSquare;
 
             
