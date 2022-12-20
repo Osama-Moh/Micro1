@@ -40,9 +40,26 @@ rowX            DW      ? ; coordinates SrcSquare
 rowY            DW      ?
 sourceLocationInES     DW      ?
 
-Currentcolor    DW      ? 
+Currentcolor    DW      06h 
 
 chessData db  9C40h dup(?); all pixels in the grid in the start 
+
+RevertFlickering    MACRO
+LOCAL FINISHLBL
+cmp [Currentcolor] , 08h ; 
+                          jnz FINISHLBL ;
+                          push AX; 
+                          mov cx , [Currentcolor] 
+                          push cx ;
+                          mov cl , [chosenSquareColor]
+                          mov [Currentcolor], cx
+                          mov ch , 0ch ; 
+                          push cx ; 
+                          CALL DrawSquare
+                          add sp , 4h ;
+                          pop AX;
+FINISHLBL:  
+ENDM
 
 ; draw intial state of pieces and grid  
 DrawInitialState     MACRO
@@ -192,8 +209,10 @@ MoveSquare:         ; this will the program main Loop
 CALL GetSquareColor ; get color in current rowx and rowy 
 mov dl, [chosenSquareColor] ; color in the dx ; 
 mov dh, 0h
+jmp GAME2
 
-GAME:     cmp dx, 08h ; 15h is the color of the  flickering  
+GAME:     mov dx, [Currentcolor] ; color in the dx ; 
+          GAME2:    cmp dx, 08h ; 15h is the color of the  flickering  
           jnz flashColor ; if chosenSquarecolor not equal the flickering color ; 
           mov al, [chosenSquareColor] ; 
           mov ah, 0ch ;
@@ -210,6 +229,7 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
 
                     pop dx ; color that is drawn during last call of DrawSquare , will be used in the next loop    
                     sub dx, 0c00h ; sub 0c because ax was 0c15 ;
+                    mov [Currentcolor], dx
                     add sp, 2h ; free stack because i pushed dx and ax above ;
 
 ;;;;;;;;;;;;;;;;;;;;;; Moving Pieces
@@ -232,11 +252,15 @@ GAME:     cmp dx, 08h ; 15h is the color of the  flickering
         jnz Dest
         ChangeSelected: mov al, [chosenSquare] ; chosend Square will be changed every arrow move (also it appears below ) 
         mov [sourceSquare], al ; make sourceSquare equal to chosenSquare ,so when enter is pressed sourceSquare will be the chosenSquare 
+        RevertFlickering
         MOV CL, [chosenSquareColor] ; the color if the current rowX and rowY , it is changing also every arrow press
         MOV CH, 0H ;
         PUSH CX ; so it is contain the color of the background "before" the last drawSquare call 
         push dx;
         CALL RULES
+        mov cl, [chosenSquareColor]
+        mov ch, 0h
+        mov [Currentcolor], cx
         pop dx; 
         jmp Arrows
 
@@ -382,18 +406,7 @@ POP DX
                     JMP GAME
             Handlearrows: ; is just checking if it is Currentcolor of the square is the same as flickering color ; Before moving i need to reset it to the original backgrnd color 
                           ; so to make it short is just get the origin color from [chosenSquareColor]  and push it to the stack , so that DrawSquare procedure use it and draw the origin color square again  
-                          cmp [Currentcolor] , 0c08h ; 
-                          jnz COMP ;
-                          push AX; 
-                          mov cx , [Currentcolor] 
-                          sub cx , 0c00h;
-                          push cx ;
-                          mov cl , [chosenSquareColor]
-                          mov ch , 0ch ; 
-                          push cx ; 
-                          CALL DrawSquare
-                          add sp , 4h ;
-                          pop AX; 
+                           RevertFlickering
                           COMP:
                           cmp ah , 48h ; ascii for up
                           jz UP 
@@ -541,7 +554,6 @@ DrawSquare      PROC
     mov bp, sp
     mov si, [bp+4] ; old background color 
     mov di, [bp+2] ; new color that will be drawn
-    mov [Currentcolor], di 
 
     mov cx, [rowY] ; colomn 
     mov dx, [rowX] ; row 
