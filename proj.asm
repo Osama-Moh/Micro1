@@ -2,23 +2,55 @@
 .model small
 .stack 64
 .data
+chosenSquare    db     3cH ; 
+chosenSquareColor   DB  ? ; 
+numOfDirections         db      0h ; Procedure Rules sets those variables according to the piece
+ArrayOfDirections       db      8 dup(0h), 0h ; Permissible moves for a piece
+ArrayOfRepetitions      db      8 dup(0h), 0h ;
+sourceSquare    db      0FFH ; square to be moved 
+destSquare      db      0FFH ; destination after movment 
+Currentcolor    DW      06h 
+sourceSquareColor   dw      ?
+rowX            DW      ? ; coordinates SrcSquare 
+rowY            DW      ?
+
+
+chosenSquareWhite    db     3cH ; 
+chosenSquareColorWhite   DB  ? ; 
+numOfDirectionsWhite         db      0h ; Procedure Rules sets those variables according to the piece
+ArrayOfDirectionsWhite       db      8 dup(0h), 0h ; Permissible moves for a piece
+ArrayOfRepetitionsWhite      db      8 dup(0h), 0h ;
+sourceSquareWhite    db      0FFH ; square to be moved 
+destSquareWhite      db      0FFH ; destination after movment 
+CurrentcolorWhite    DW      06h 
+sourceSquareColorWhite   dw      ?
+rowXWhite            DW      ? ; coordinates SrcSquare 
+rowYWhite            DW      ?
+
+chosenSquareBlack    db     3cH ; 
+chosenSquareColorBlack   DB  ? ; 
+numOfDirectionsBlack         db      0h ; Procedure Rules sets those variables according to the piece
+ArrayOfDirectionsBlack       db      8 dup(0h), 0h ; Permissible moves for a piece
+ArrayOfRepetitionsBlack      db      8 dup(0h), 0h ;
+sourceSquareBlack    db      0FFH ; square to be moved 
+destSquareBlack      db      0FFH ; destination after movment 
+CurrentcolorBlack    DW      06h 
+sourceSquareColorBlack   dw      ?
+rowXBlack            DW      ? ; coordinates SrcSquare 
+rowYBlack            DW      ?
+
 ArrayOfWhiteDead             db      16 DUP(0h)
 numOfWhiteDead          dw      0h
 ArrayOfBlackDead             db      16 DUP(0h)
 numOfBlackDead          dw      0h
 ArrayOfMoves            db      55h DUP(?)
 isItWhite               db      0h ; 0h ->white ; 1h -> black;  
-chosenSquare    db     3cH ; 
-chosenSquareColor   DB  ? ; 
-numOfDirections         db      0h ; Procedure Rules sets those variables according to the piece
-ArrayOfDirections       db      8 dup(0h), 0h ; Permissible moves for a piece
-ArrayOfRepetitions      db      8 dup(0h), 0h ;
 RepetionCounter         db      1h
-GoToNext                db      1h ; To be removed
+GoToNext                db      1h
 NewSourceSquare         db      ?
 ColorCounter            dw      ?
 DirectionCounter        dw      ?
-Enemy                   dw      ?
+Enemy                   dw      ? ; To Be deleted
 DESELECT                db      0h
 
 boardFile   db   'chess.bin', 0h; chess board 
@@ -36,18 +68,12 @@ Pieces      DB    8h DUP(0), 0ffh DUP(0), 20h  ; empty 8 bytes , total 32* 8 -1 
 countX      DW    ?
 countY      DW    ?
 
-sourceSquare    db      0FFH ; square to be moved 
-destSquare      db      0FFH ; destination after movment 
 destX           dw        ? ; coordinates of destSquare 
 destY           dw        ?
-rowX            DW      ? ; coordinates SrcSquare 
-rowY            DW      ?
 sourceLocationInES     DW      ?
 
-Currentcolor    DW      06h 
-sourceSquareColor   dw      ?
-
 chessData db  9C40h dup(?); all pixels in the grid in the start 
+; ------------------------------------ Problematic ----------------------------------------------------------
 
 RevertFlickering    MACRO
 LOCAL FINISHLBL
@@ -210,14 +236,12 @@ PUSH CX
 CALL SquaresCalculation
 add sp, 2h
 
-MoveSquare:         ; this will the program main Loop    
 CALL GetSquareColor ; get color in current rowx and rowy 
 mov dl, [chosenSquareColor] ; color in the dx ; 
 mov dh, 0h
-jmp GAME2
+mov [Currentcolor], dx
 
-GAME:     mov dx, [Currentcolor] ; color in the dx ; 
-          GAME2:    cmp dx, 08h ; 15h is the color of the  flickering  
+          cmp dx, 08h ; 15h is the color of the  flickering  
           jnz flashColor ; if chosenSquarecolor not equal the flickering color ; 
           mov al, [chosenSquareColor] ; 
           mov ah, 0ch ;
@@ -453,7 +477,12 @@ mov [destSquare], 0ffh
             add [rowY],19h;
             add [chosenSquare], 1h ;  the number of square increase by 1h;  
             jmp MoveSquare;
-
+            MoveSquare:         ; this will the program main Loop    
+            CALL GetSquareColor ; get color in current rowx and rowy 
+            mov dl, [chosenSquareColor] ; color in the dx ; 
+            mov dh, 0h
+            mov [Currentcolor], dx
+            jmp GAME
             
             
 
