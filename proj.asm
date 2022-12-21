@@ -10,6 +10,7 @@ destY           dw        ?
 rowX            DW      ? ; coordinates SrcSquare 
 rowY            DW      ?
 sourceLocationInES     DW      ?
+TokenFile       db     'Coin.txt', 0h
 
 Currentcolor    DW      ? 
 boardFile   db   'chess.bin', 0h; chess board 
