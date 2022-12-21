@@ -104,7 +104,7 @@ PlacePowerup    Macro   ;;this macro will be executed when the number of correct
     mul cl
     mov si,offset Pieces
     add si,ax
-    mov byte pre[si+7],0H
+    mov Pieces[si+7],0H
     mov cx,271H
     mov di,offset chessData
     push si
