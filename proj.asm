@@ -111,7 +111,7 @@ PlacePowerup    Macro   ;;this macro will be executed when the number of correct
     push cx
     push di
     call HandleFile
-    popa
+    add sp, 6H
     mov byte ptr [si+7]
     push bx
 
