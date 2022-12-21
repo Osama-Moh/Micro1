@@ -112,10 +112,10 @@ PlacePowerup    Macro   ;;this macro will be executed when the number of correct
     push di
     call HandleFile
     add sp, 6H
-    mov byte ptr [si+7]
+    mov byte ptr [si+7], 20h
     push bx
 
-    mov al,rand
+    mov al,[rand]
     mov ah,0h
     push ax
     call SquaresCalculation 
@@ -125,7 +125,7 @@ PlacePowerup    Macro   ;;this macro will be executed when the number of correct
     PUSH dx
     mov dx, [rowY]
     push dx
-    Call Drawpowerup
+    Call DrawPiece
     pop dx
     pop dx
 ENDM
