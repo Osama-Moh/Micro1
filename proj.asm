@@ -2,6 +2,10 @@
 .model small
 .stack 64
 .data
+ArrayOfWhiteDead             db      16 DUP(0h)
+numOfWhiteDead          dw      0h
+ArrayOfBlackDead             db      16 DUP(0h)
+numOfBlackDead          dw      0h
 ArrayOfMoves            db      55h DUP(?)
 isItWhite               db      0h ; 0h ->white ; 1h -> black;  
 chosenSquare    db     3cH ; 
@@ -23,9 +27,9 @@ MovesFile   db   'moves.txt', 0h; file that contains moves
 DIRECTORY       DB      'D:\Pieces',0h ; 
 filehandle dw ?
 
-Squares     DB     07h, 05h, 03h, 02h, 01h, 04h, 06h, 08h, 09h, 0ah, 0bh, 0ch, 0dh, 0eh, 0fh, 10h ; pieces order in the .txt files 
+Squares     DB     07h, 05h, 03h, 01h, 02h, 04h, 06h, 08h, 09h, 0ah, 0bh, 0ch, 0dh, 0eh, 0fh, 10h ; pieces order in the .txt files 
             DB     32 DUP(0h)
-            DB     19h, 1ah, 1bh, 1ch, 1dh, 1eh, 1fh, 20h, 17h, 15h, 13h, 12h, 11h, 14h, 16h, 18h 
+            DB     19h, 1ah, 1bh, 1ch, 1dh, 1eh, 1fh, 20h, 17h, 15h, 13h, 11h, 12h, 14h, 16h, 18h 
 
 Pieces      DB    8h DUP(0), 0ffh DUP(0), 20h  ; empty 8 bytes , total 32* 8 -1 because each name have 8 bytes except the last one has 7 , 20h =32d ->number of pieace
 
@@ -283,13 +287,27 @@ GAME:     mov dx, [Currentcolor] ; color in the dx ;
                 JMP Arrows
         selectNewPiece: CALL ColorSelected
                         jmp ChangeSelected
-        GoToDest:   mov al, [chosenSquare]  
-        mov [destSquare], al ; setting desSquare after pressing the second ENTERKEY; 
-        cmp al, [sourceSquare]; make sure SourceSquare not equal to DesSquare because the piece will be deleted if the ENTER is pressed twice on the same Square
+        GoToDest:   mov bl, [chosenSquare]  
+        mov [destSquare], bl ; setting desSquare after pressing the second ENTERKEY; 
+        cmp bl, [sourceSquare]; make sure SourceSquare not equal to DesSquare because the piece will be deleted if the ENTER is pressed twice on the same Square
         jz Arrows; jmp arrows if srcsqare == destsquare
             ;Update Square ;
         CALL ColorSelected
-        mov ch , 0h ;
+        mov bl, [destSquare]
+        mov bh, 0h
+        cmp Squares[bx], 0h
+        jz NOKILL
+        mov al, Squares[bx]
+        cmp [isItWhite], 0h ; IsitWhite currently is the enemy not always.
+        jz WhiteEnemy
+        mov di, [numOfBlackDead]
+        mov [ArrayOfBlackDead+di], al
+        inc [numOfBlackDead]
+        jmp NOKILL
+        WhiteEnemy: mov di, [numOfWhiteDead]
+        mov [ArrayOfWhiteDead+di], al
+        inc [numOfWhiteDead]
+        NOKILL: mov ch , 0h ;
         mov bh , 0h ;
         mov bl , [sourceSquare] ;
         mov cl , Squares[bx]
@@ -330,6 +348,7 @@ GAME:     mov dx, [Currentcolor] ; color in the dx ;
         mov [sourceLocationInES], ax ; sourceLocationInES know holds the offset of the Sourcesquare pixel 
         
         mov cx, [sourceSquareColor] ; color of the background 
+        mov ch, 0dh
         mov si, cx ; si color of the background  
         
         mov bl, 0h ; counter for the coloumns 
@@ -342,7 +361,6 @@ GAME:     mov dx, [Currentcolor] ; color in the dx ;
                         mov ah, 0dh
                         int 10h
 
-                        mov ah, 0h
                         cmp ax, si; if the pixel contain the same color of the background No copy will occure 
                         jz NOCOPY
                         STOSB ; store  es:di [location if the pixel of destination Square in extra segement] = AL [color of the pixel ]
@@ -353,7 +371,8 @@ GAME:     mov dx, [Currentcolor] ; color in the dx ;
                         mov di, cx ; return back the offest of di 
                         JMP COPY
 ; NOTE : AFTER STOSB di incremented automaticaly  
-                        NOCOPY: inc di ; if no copy done I need to move di to the next pixel 
+                        NOCOPY: mov al, [chosenSquareColor]
+                        STOSB
                         COPY: inc bl ; increment coloumn counter ;
                         inc [sourceLocationInES] ; increment to move to the next pixel 
                         inc [rowY] 
