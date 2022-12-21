@@ -370,6 +370,8 @@ mov [FirstTime], 0h
                           jz WRIGHT 
                           cmp al , 61h;  ascii for left 
                           jz WLEFT;
+                          cmp al, 0dh
+                          jz SWITCHWHITE
                           cmp ah, 48h
                           jb MoveSquareWhite
                           cmp ah, 50h
