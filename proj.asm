@@ -682,8 +682,6 @@ INDIRECTION:        mov al, ch
 
                     DESELECTLBL: mov ax, 35h
                               mov bx, di
-                              cmp bx, 35h
-                              jnz NODRAWHere
                               mov bh, 0ch
                               cmp ch, [destSquare]
                               jnz DRAW
