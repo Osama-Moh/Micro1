@@ -11,6 +11,8 @@ sourceSquare    db      0FFH ; square to be moved
 destSquare      db      0FFH ; destination after movment 
 FlickeringTime  db      1h
 SelectionKey    db      0dh
+SELECTED        db      0h
+EnemySourceSquare   db  0h
 Currentcolor    DW      5Ah 
 sourceSquareColor   dw      ?
 rowX            DW      ? ; coordinates SrcSquare 
@@ -27,6 +29,8 @@ sourceSquareWhite    db      0FFH ; square to be moved
 destSquareWhite      db      0FFH ; destination after movment 
 FlickeringTimeWhite  db      1h
 SelectionKeyWhite         db      71h
+SELECTEDWhite        db      0h
+EnemySourceSquareWhite   db  0h
 CurrentcolorWhite    DW      06h 
 sourceSquareColorWhite   dw      ?
 rowXWhite            DW      ? ; coordinates SrcSquare 
@@ -42,6 +46,8 @@ sourceSquareBlack    db      0FFH ; square to be moved
 destSquareBlack      db      0FFH ; destination after movment 
 FlickeringTimeBlack  db      1h
 SelectionKeyBlack    db      0dh
+SELECTEDBlack        db      0h
+EnemySourceSquareBlack    db      0h
 CurrentcolorBlack    DW      5Ah 
 sourceSquareColorBlack   dw      ?
 rowXBlack            DW      ? ; coordinates SrcSquare 
@@ -62,7 +68,10 @@ Enemy                   dw      ? ; To Be deleted
 DESELECT                db      0h
 WhichTurn               dw      ? ; Source
 WhichToExchange         dw      ? ; Destination
+WhichIsEnemy            dw      ? ; Enemy
 FirstTime               db      1h
+OrganizationTrigger     db      0h
+OrganizationSelector    db      0h
 
 boardFile   db   'chess.bin', 0h; chess board 
 firstState  db   'board.txt', 0h; file contain all names of the pieces names 
@@ -275,10 +284,9 @@ mov [Currentcolor], dx
 jmp SkipFirstTime
 
 GAMELBLBlack:
-mov di, OFFSET chosenSquareBlack ; Source
-MOV [WhichTurn], di
-mov di, OFFSET chosenSquare ; Destination
-MOV [WhichToExchange], di
+MOV [WhichTurn], OFFSET chosenSquareBlack ; Source
+MOV [WhichToExchange], OFFSET chosenSquare ; Destination
+mov [WhichIsEnemy], OFFSET chosenSquare    ; Enemy Data Copied to At this time's data
 CALL SwitchTurns
 mov [isItWhite], 0h
 SkipFirstTime:   CALL GAME
@@ -338,16 +346,14 @@ SkipFirstTime:   CALL GAME
             mov ah,0h  ; empty the buffer if the key is pressed 
             int 16h
 
-SWITCHBLACK: mov di, OFFSET chosenSquare ; Source
-MOV [WhichTurn], di
-mov di, OFFSET chosenSquareBlack ; Destination
-MOV [WhichToExchange], di           
+SWITCHBLACK: MOV [WhichTurn], OFFSET chosenSquare ; Source
+MOV [WhichToExchange], OFFSET chosenSquareBlack ; Destination
+mov [WhichIsEnemy], OFFSET chosenSquareWhite    ; Copy My Move to Enemy to detect
 CALL SwitchTurns
 
-mov di, OFFSET chosenSquareWhite ; Source
-MOV [WhichTurn], di
-mov di, OFFSET chosenSquare ; Destination
-MOV [WhichToExchange], di           
+MOV [WhichTurn], OFFSET chosenSquareWhite ; Source
+MOV [WhichToExchange], OFFSET chosenSquare ; Destination
+mov [WhichIsEnemy], OFFSET chosenSquare    ; Enemy Data Copied to At this time's data
 CALL SwitchTurns
 mov [isItWhite], 1h
 
@@ -427,10 +433,9 @@ mov [FirstTime], 0h
             mov ah, 0h
             int 16h
 
-SWITCHWHITE: mov di, OFFSET chosenSquare ; Source
-MOV [WhichTurn], di
-mov di, OFFSET chosenSquareWhite ; Destination
-MOV [WhichToExchange], di           
+SWITCHWHITE: MOV [WhichTurn], OFFSET chosenSquare ; Source
+MOV [WhichToExchange], OFFSET chosenSquareWhite ; Destination
+mov [WhichIsEnemy], OFFSET chosenSquareBlack    ; Copy My Move to the enemy to update
 CALL SwitchTurns
 JMP GAMELBLBlack
 
@@ -668,6 +673,8 @@ INDIRECTION:        mov al, ch
                     push cx
                     cmp [DESELECT], 1h
                     jz DESELECTLBL
+                    cmp [OrganizationTrigger], 1h
+                    jz DESELECTLBL
 
                     mov ax, di
                     mov bx, 0c35h
@@ -675,6 +682,8 @@ INDIRECTION:        mov al, ch
 
                     DESELECTLBL: mov ax, 35h
                               mov bx, di
+                              cmp bx, 35h
+                              jnz NODRAWHere
                               mov bh, 0ch
                               cmp ch, [destSquare]
                               jnz DRAW
@@ -685,22 +694,26 @@ INDIRECTION:        mov al, ch
                     CALL DrawSquare
                     add sp, 4h
 
-                    pop cx
+                    NODRAWHere: pop cx
                     mov bx, [DirectionCounter]
                     pop bp
                     mov al, [ArrayOfRepetitions+bx]
                     cmp al, 0h
                     jz CONFIGURE
                     cmp bp, 0h
-                    jz CONFIGURE
-                    add ch, [ArrayOfDirections+bx]
+                    jnz CONTADD
+                    cmp [OrganizationSelector], 1h
+                    jnz CONFIGURE
+                    mov [OrganizationTrigger], 1h
+                    CONTADD:    add ch, [ArrayOfDirections+bx]
                     inc [RepetionCounter]
                     JMP INDIRECTION
 
 RESCONFIGURE:       pop cx
                     pop bp
 
-CONFIGURE:          inc [DirectionCounter]
+CONFIGURE:          mov [OrganizationTrigger], 0h
+                    inc [DirectionCounter]
                     mov bx, [DirectionCounter]
                     mov ch, 0h
                     mov [RepetionCounter], 1h
@@ -708,8 +721,11 @@ CONFIGURE:          inc [DirectionCounter]
                     jb BeginColoring
 
 cmp [DESELECT], 1h
-jz RESETLBL
+jz UNSELECT
+mov [SELECTED], 1h
 mov [chosenSquareColor], 35h
+jmp RESETLBL
+UNSELECT:   mov [SELECTED], 0h
 RESETLBL:  pop di
 mov [rowY], di
 pop di
@@ -973,7 +989,16 @@ GAME    PROC
 
 ;;;;;;;;;;;;;;;;;;;;;; Moving Pieces
         ; selection begins when we press ENTER kay 
-        SourceCheck:    mov ah, 1H ;
+        SourceCheck:    cmp [SELECTED], 1h
+                        jnz SeeKeys
+                        cmp [EnemySourceSquare], 0h
+                        jz SeeKeys
+                        mov [DESELECT], 0h
+                        mov [OrganizationSelector], 1h
+                        CALL ColorSelected
+                        mov [OrganizationSelector], 0h
+        SeeKeys:    mov [EnemySourceSquare], 0h
+        mov ah, 1H ;
         int 16h
         cmp al, [SelectionKey] ; ENTER KEY Ascii Code ; 
         jnz FINISHGAME ; if its is not clicked  jmp to FINISHGAME (label below )
@@ -1047,6 +1072,7 @@ GAME    PROC
         NOKILL: mov ch , 0h ;
         mov bh , 0h ;
         mov bl , [sourceSquare] ;
+        mov [EnemySourceSquare], bl
         mov cl , Squares[bx]
         mov Squares[bx] , 0h;
         mov bl ,[destSquare]
@@ -1147,7 +1173,7 @@ SwitchTurns     PROC
 mov di, [WhichTurn]
 mov bx, [WhichToExchange]
 mov cx, bx
-add cx, 19h
+add cx, 1ah
 
 TurnsLoopByte:  mov al, BYTE PTR[di]
                 mov BYTE PTR [bx], al
@@ -1156,7 +1182,13 @@ TurnsLoopByte:  mov al, BYTE PTR[di]
                 cmp bx, cx
                 jnz TurnsLoopByte
 
-add cx, 0ah
+mov al, [di]
+mov si, [WhichIsEnemy]
+add si, 1ah
+mov [si], al
+inc di
+inc bx
+add cx, 0bh
 
 TurnsLoopWord:  mov ax, WORD PTR[di]
                 mov WORD PTR [bx], ax
