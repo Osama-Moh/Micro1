@@ -599,38 +599,4 @@ random proc
 RET;
 random ENDP
 
-Drawpowerup proc
-    mov bp , sp
-    LEA si , chessData 
-    mov cx , 30h ; 
-    ADD CX , [BP + 4] ;
-    mov dx , [BP + 6] ;
-    mov ah , 0ch ;
-
-    ADD CX, 19H
-    MOV [countX], CX
-    SUB CX, 19H
-
-    add dx, 19h
-    MOV [countY], dx
-    sub dx, 19h
-    
-    poweruploop :
-                mov al ,[si] ;
-                cmp al, 06h
-                jz PUDRAW
-                int 10h;
-                PUDRAW: inc cx;
-                inc si;
-                cmp cx , [countX];
-                JNE poweruploop ;
-                mov cx , [bp+4] ;
-                add cx, 30h
-                inc dx ;
-                cmp dx, [countY];
-                JNE poweruploop;
-   
-Ret;
-Drawpowerup ENDP
-
 End main
