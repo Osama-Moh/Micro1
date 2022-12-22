@@ -16,7 +16,6 @@ sourceSquareColor   dw      ?
 rowX            DW      ? ; coordinates SrcSquare 
 rowY            DW      ?
 Flicker         dw      08h
-OriginalColors  dw      9600h  ; The original colors of selected squares.
 
 
 chosenSquareWhite    db     3H ; 
@@ -33,7 +32,6 @@ sourceSquareColorWhite   dw      ?
 rowXWhite            DW      ? ; coordinates SrcSquare 
 rowYWhite            DW      ?
 FlickerWhite         dw      31h
-OriginalColorsWhite  dw      9500h  ; The original colors of selected squares.
 
 chosenSquareBlack    db     3bH ; 
 chosenSquareColorBlack   DB  ? ; 
@@ -49,7 +47,6 @@ sourceSquareColorBlack   dw      ?
 rowXBlack            DW      ? ; coordinates SrcSquare 
 rowYBlack            DW      ?
 FlickerBlack         dw      08h
-OriginalColorsBlack  dw      9600h  ; The original colors of selected squares.
 
 ArrayOfWhiteDead             db      16 DUP(0h)
 numOfWhiteDead          dw      0h
@@ -60,7 +57,6 @@ isItWhite               db      0h ; 0h ->white ; 1h -> black;
 RepetionCounter         db      1h
 GoToNext                db      1h
 NewSourceSquare         db      ?
-ColorCounter            dw      ?
 DirectionCounter        dw      ?
 Enemy                   dw      ? ; To Be deleted
 DESELECT                db      0h
@@ -193,6 +189,26 @@ DrawInitialState     MACRO
                     dec di
                     jnz ParseMoves
 
+mov bx, OFFSET chessData+9500h
+mov cx, 0h
+mov dl, 8h
+ColorsLoop:     cmp cx, 0h
+                jnz DARK
+                mov [bx], 5ah
+                mov cx, 1h
+                jmp CONTLOOP
+                DARK:   mov [bx], 06h
+                mov cx, 0h
+                CONTLOOP: inc bx
+                          cmp bx, OFFSET chessData+9540h
+                          jz FINISHinsertion
+                          dec dl
+                          jnz ColorsLoop
+                          XOR cx, 1h
+                          mov dl, 8h
+                          jmp ColorsLoop
+
+FINISHinsertion:    
 ENDM
 .code
 main PROC far
@@ -604,8 +620,6 @@ closeFile ENDP;
 
 ColorSelected       PROC
 
-mov [ColorCounter], 0h
-
 mov di, [rowX]
 push di
 mov di, [rowY]
@@ -646,32 +660,25 @@ INDIRECTION:        mov al, ch
                     push di ; Problematic. Very Problematic.
                     CALL SquaresCalculation
                     add sp, 2h
+                    pop cx
+                    mov bl, ch
+                    mov bh, 0h
+                    mov bl, [chessData+9500h+bx]
+                    mov di, bx
+                    push cx
                     cmp [DESELECT], 1h
                     jz DESELECTLBL
-                    CALL GetSquareColor
 
-                    mov di, [OriginalColors]
-                    add di, OFFSET chessData
-                    mov bx, [ColorCounter]
-                    mov al, [chosenSquareColor]
-                    mov [di+bx], al
-                    inc [ColorCounter]
-
-                    mov ah, 0h
+                    mov ax, di
                     mov bx, 0c35h
                     jmp DRAW
 
                     DESELECTLBL: mov ax, 35h
-                              mov si, [ColorCounter]
-                              mov bx, [OriginalColors]
-                              mov bl, [chessData+bx+si]
+                              mov bx, di
                               mov bh, 0ch
-                              pop cx
                               cmp ch, [destSquare]
-                              jnz ContinueDehk
+                              jnz DRAW
                               mov [chosenSquareColor], bl
-                              ContinueDehk:   push cx
-                              inc [ColorCounter]
 
                     DRAW: push ax
                     push bx
@@ -952,12 +959,12 @@ GAME    PROC
                     PUSH AX ; color that will be drawn; 
                     CALL DrawSquare ; draw square 
                     ; wait 1 second to flicker again 
-                    MOV CX, 3H
-                    MOV DX, 0F000H
+                    MOV CX, 2H
+                    MOV DX, 0000H
                     MOV AH, 86H
                     INT 15H       
 
-                    mov [FlickeringTime], 3h
+                    mov [FlickeringTime], 9h
 
                     pop dx ; color that is drawn during last call of DrawSquare , will be used in the next loop    
                     sub dx, 0c00h ; sub 0c because ax was 0c15 ;
@@ -1149,7 +1156,7 @@ TurnsLoopByte:  mov al, BYTE PTR[di]
                 cmp bx, cx
                 jnz TurnsLoopByte
 
-add cx, 0ch
+add cx, 0ah
 
 TurnsLoopWord:  mov ax, WORD PTR[di]
                 mov WORD PTR [bx], ax
