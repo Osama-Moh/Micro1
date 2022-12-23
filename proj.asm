@@ -956,7 +956,17 @@ RET
 CheckOpponent endp 
 
 GAME    PROC
-          mov dx, [Currentcolor]
+          cmp [EnemySourceSquare], 0h
+          jz NothingChosen
+          CALL GetSquareColor
+          mov bl, [chosenSquareColor]
+          mov bh, 0h
+          cmp bx, [Flicker]
+          jnz NothingChosen
+          mov bl, [chosenSquare]
+          mov al, [chessData+9500h+bx]
+          mov [chosenSquareColor], al
+          NothingChosen:    mov dx, [Currentcolor]
           cmp dx, [Flicker] ; 15h is the color of the  flickering  
           jnz flashColor ; if chosenSquarecolor not equal the flickering color ; 
           mov al, [chosenSquareColor] ; 
@@ -1009,17 +1019,20 @@ GAME    PROC
         ;jz FINISHGAME
         cmp [sourceSquare], 0ffh ; if sourceSquare is 0ffh then it is not defined  yet  
         jnz Dest
+        mov [EnemySourceSquare], bl
+        inc [EnemySourceSquare]
         MOV AL, [Squares+bx]
+        dec al
         mov ah, 0h
         shl ax, 4H
         XOR ah, [isItWhite]
         jz FINISHGAME
-        ChangeSelected: mov al, [chosenSquare] ; chosend Square will be changed every arrow move (also it appears below ) 
-        mov [sourceSquare], al ; make sourceSquare equal to chosenSquare ,so when enter is pressed sourceSquare will be the chosenSquare 
+        ChangeSelected: mov bl, [chosenSquare] ; chosend Square will be changed every arrow move (also it appears below ) 
+        mov [sourceSquare], bl ; make sourceSquare equal to chosenSquare ,so when enter is pressed sourceSquare will be the chosenSquare 
+        mov bh, 0h
+        mov bl, [chessData+9500h+bx]
+        mov [sourceSquareColor], bx
         RevertFlickering
-        MOV CL, [chosenSquareColor] ; the color if the current rowX and rowY , it is changing also every arrow press
-        mov ch, 0h
-        MOV [sourceSquareColor], cx ;
         CALL RULES
         mov cl, [chosenSquareColor]
         mov ch, 0h
@@ -1029,6 +1042,9 @@ GAME    PROC
         Dest:   
         ; CALL RULES -------------------------------------------
         mov [DESELECT], 1H
+        mov al, 1h
+        add al, [sourceSquare]
+        mov [EnemySourceSquare], al
         cmp [chosenSquareColor], 35h
         jz GoToDest
         mov bl, [chosenSquare]
@@ -1068,7 +1084,6 @@ GAME    PROC
         NOKILL: mov ch , 0h ;
         mov bh , 0h ;
         mov bl , [sourceSquare] ;
-        mov [EnemySourceSquare], bl
         mov cl , Squares[bx]
         mov Squares[bx] , 0h;
         mov bl ,[destSquare]
