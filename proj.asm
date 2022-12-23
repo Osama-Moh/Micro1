@@ -1,34 +1,87 @@
 .286
-.model Small
+.model small
 .stack 64
 .data
-
+chosenSquare    db     3BH ; To Whom is moving variables. Please note to move these variables togetherrrrrrrrrrrrrrrrr.
+chosenSquareColor   DB  ? ; 
+numOfDirections         db      0h ; Procedure Rules sets those variables according to the piece
+ArrayOfDirections       db      8 dup(0h), 0h ; Permissible moves for a piece
+ArrayOfRepetitions      db      8 dup(0h), 0h ;
 sourceSquare    db      0FFH ; square to be moved 
 destSquare      db      0FFH ; destination after movment 
-destX           dw        ? ; coordinates of destSquare 
-destY           dw        ?
+FlickeringTime  db      1h
+SelectionKey    db      0dh
+Currentcolor    DW      5Ah 
+sourceSquareColor   dw      ?
 rowX            DW      ? ; coordinates SrcSquare 
 rowY            DW      ?
-sourceLocationInES     DW      ?
-TokenFile       db     'outtkn1.bin', 0h
+Flicker         dw      08h
 
-Currentcolor    DW      ? 
+
+chosenSquareWhite    db     3H ; 
+chosenSquareColorWhite   DB  ? ; 
+numOfDirectionsWhite         db      0h ; Procedure Rules sets those variables according to the piece
+ArrayOfDirectionsWhite       db      8 dup(0h), 0h ; Permissible moves for a piece
+ArrayOfRepetitionsWhite      db      8 dup(0h), 0h ;
+sourceSquareWhite    db      0FFH ; square to be moved 
+destSquareWhite      db      0FFH ; destination after movment 
+FlickeringTimeWhite  db      1h
+SelectionKeyWhite         db      71h
+CurrentcolorWhite    DW      06h 
+sourceSquareColorWhite   dw      ?
+rowXWhite            DW      ? ; coordinates SrcSquare 
+rowYWhite            DW      ?
+FlickerWhite         dw      31h
+
+chosenSquareBlack    db     3bH ; 
+chosenSquareColorBlack   DB  ? ; 
+numOfDirectionsBlack         db      0h ; Procedure Rules sets those variables according to the piece
+ArrayOfDirectionsBlack       db      8 dup(0h), 0h ; Permissible moves for a piece
+ArrayOfRepetitionsBlack      db      8 dup(0h), 0h ;
+sourceSquareBlack    db      0FFH ; square to be moved 
+destSquareBlack      db      0FFH ; destination after movment 
+FlickeringTimeBlack  db      1h
+SelectionKeyBlack    db      0dh
+CurrentcolorBlack    DW      5Ah 
+sourceSquareColorBlack   dw      ?
+rowXBlack            DW      ? ; coordinates SrcSquare 
+rowYBlack            DW      ?
+FlickerBlack         dw      08h
+
+ArrayOfWhiteDead             db      16 DUP(0h)
+numOfWhiteDead          dw      0h
+ArrayOfBlackDead             db      16 DUP(0h)
+numOfBlackDead          dw      0h
+ArrayOfMoves            db      55h DUP(?)
+isItWhite               db      0h ; 0h ->white ; 1h -> black;  
+RepetionCounter         db      1h
+GoToNext                db      1h
+NewSourceSquare         db      ?
+DirectionCounter        dw      ?
+Enemy                   dw      ? ; To Be deleted
+DESELECT                db      0h
+WhichTurn               dw      ? ; Source
+WhichToExchange         dw      ? ; Destination
+FirstTime               db      1h
+
 boardFile   db   'chess.bin', 0h; chess board 
 firstState  db   'board.txt', 0h; file contain all names of the pieces names 
+MovesFile   db   'moves.txt', 0h; file that contains moves
 DIRECTORY       DB      'D:\Pieces',0h ; 
 filehandle dw ?
 
-Squares     DB     07h, 05h, 03h, 02h, 01h, 04h, 06h, 08h, 09h, 0ah, 0bh, 0ch, 0dh, 0eh, 0fh, 10h ; pieces order in the .txt files 
+Squares     DB     07h, 05h, 03h, 01h, 02h, 04h, 06h, 08h, 09h, 0ah, 0bh, 0ch, 0dh, 0eh, 0fh, 10h ; pieces order in the .txt files 
             DB     32 DUP(0h)
-            DB     19h, 1ah, 1bh, 1ch, 1dh, 1eh, 1fh, 20h, 17h, 15h, 13h, 12h, 11h, 14h, 16h, 18h 
+            DB     19h, 1ah, 1bh, 1ch, 1dh, 1eh, 1fh, 20h, 17h, 15h, 13h, 11h, 12h, 14h, 16h, 18h 
 
 Pieces      DB    8h DUP(0), 0ffh DUP(0), 20h  ; empty 8 bytes , total 32* 8 -1 because each name have 8 bytes except the last one has 7 , 20h =32d ->number of pieace
 
 countX      DW    ?
 countY      DW    ?
 
-chosenSquare    db     3cH ; 
-chosenSquareColor   DB  ? ; 
+destX           dw        ? ; coordinates of destSquare 
+destY           dw        ?
+sourceLocationInES     DW      ?
 
 m       db      64d
 a       db      25d
@@ -38,6 +91,25 @@ rand    db      ?
 numberofmoves       db          ?
 
 chessData db  9C40h dup(?); all pixels in the grid in the start 
+; ------------------------------------ Problematic ----------------------------------------------------------
+
+RevertFlickering    MACRO
+LOCAL FINISHLBL
+mov di, [Flicker]
+cmp [Currentcolor] , di ; 
+                          jnz FINISHLBL ;
+                          push AX; 
+                          mov cx , [Currentcolor] 
+                          push cx ;
+                          mov cl , [chosenSquareColor]
+                          mov [Currentcolor], cx
+                          mov ch , 0ch ; 
+                          push cx ; 
+                          CALL DrawSquare
+                          add sp , 4h ;
+                          pop AX;
+FINISHLBL:  
+ENDM
 
 ; draw intial state of pieces and grid  
 DrawInitialState     MACRO
@@ -84,45 +156,66 @@ DrawInitialState     MACRO
                     cmp bx, 03fh ; each the last square 
                     Jnz DrawPiecesLoop
 
-ENDM
-
-;;load file in the trialframes
-PlacePowerup    Macro   ;;this macro will be executed when the number of correct movements is equal to specific number
-    ;; it is call will be inside the movement process and it will have a value in the encoding to make the movement avaialble
-    Incorrect:
-    call random
-    cmp [rand],40H
-    JAE Incorrect
-    mov bl,rand
-    mov bh,0h        
-    cmp Squares[bx],0H
-    jnz Incorrect
     
+    mov ax, OFFSET MovesFile
+    mov bx, 0a5h ; 165 byte to be read
+    mov cx, OFFSET chessData
+    PUSH AX
+    PUSH BX
+    PUSH CX
+    CALL HandleFile
+    add sp, 6h
 
-    mov si,offset TokenFile
-    mov cx,271H
-    mov di,offset chessData
-    push si
-    push cx
-    push di
-    call HandleFile
-    add sp, 6H
-    mov byte ptr [si+7], 20h
-    push bx
+    mov si, 0h
+    mov bx, 0h
+    mov cl, 0ah
+    mov di, 05h
 
-    mov al,[rand]
-    mov ah,0h
-    push ax
-    call SquaresCalculation 
-    pop ax
-    ADD SP, 2H 
-    MOV dx, [rowX]
-    PUSH dx
-    mov dx, [rowY]
-    push dx
-    Call DrawPiece
-    pop dx
-    pop dx
+    ParseMoves:     mov dl, [chessData+si]
+                    sub dl, 30h
+                    mov [ArrayOfMoves+bx], dl
+                    mov ch, 0h
+                    inc bx
+                    inc si
+    MovesLoop:      sub [chessData+si], 30h
+                    sub [chessData+si+1], 30h
+                    mov al, [chessData+si+1]
+                    mul cl
+                    add al, [chessData+si+2]
+                    sub al, 30h
+                    mov ah, [chessData+si]
+                    cmp [chessData+si+3], 'A'
+                    jnz CONTINUELooping
+                    NEG al
+                    CONTINUELooping:    mov WORD PTR [ArrayOfMoves+bx], ax
+                    add bx, 2h
+                    add si, 4h
+                    inc ch
+                    cmp ch, 8h
+                    jnz MovesLoop
+                    dec di
+                    jnz ParseMoves
+
+mov bx, OFFSET chessData+9500h
+mov cx, 0h
+mov dl, 8h
+ColorsLoop:     cmp cx, 0h
+                jnz DARK
+                mov [bx], 5ah
+                mov cx, 1h
+                jmp CONTLOOP
+                DARK:   mov [bx], 06h
+                mov cx, 0h
+                CONTLOOP: inc bx
+                          cmp bx, OFFSET chessData+9540h
+                          jz FINISHinsertion
+                          dec dl
+                          jnz ColorsLoop
+                          XOR cx, 1h
+                          mov dl, 8h
+                          jmp ColorsLoop
+
+FINISHinsertion:    
 ENDM
 
 .code
@@ -191,25 +284,18 @@ PUSH CX
 CALL SquaresCalculation
 add sp, 2h
 
-MoveSquare:         ; this will the program main Loop    
 CALL GetSquareColor ; get color in current rowx and rowy 
 mov dl, [chosenSquareColor] ; color in the dx ; 
 mov dh, 0h
 
-GAME:     cmp dx, 08h ; 15h is the color of the  flickering  
-          jnz flashColor ; if chosenSquarecolor not equal the flickering color ; 
-          mov al, [chosenSquareColor] ; 
-          mov ah, 0ch ;
-          jmp flashing;
-          flashColor:   mov ax, 0c08h
-          flashing: PUSH DX ; color of the current backgrnd;
-                    PUSH AX ; color that will be drawn; 
-                    CALL DrawSquare ; draw square 
-                    ; wait 1 second to flicker again 
-                    MOV CX, 3H
-                    MOV DX, 0F000H
-                    MOV AH, 86H
-                    INT 15H                    
+GAMELBLBlack:
+mov di, OFFSET chosenSquareBlack ; Source
+MOV [WhichTurn], di
+mov di, OFFSET chosenSquare ; Destination
+MOV [WhichToExchange], di
+CALL SwitchTurns
+mov [isItWhite], 0h
+SkipFirstTime:   CALL GAME
 
                     pop dx ; color that is drawn during last call of DrawSquare , will be used in the next loop    
                     sub dx, 0c00h ; sub 0c because ax was 0c15 ;
@@ -330,30 +416,12 @@ mov [destSquare], 0ffh
 POP DX
 
 ;;;;;;;;;;;;;;;;;;;;;; arrows Movement , this part is responsible for moving the flickering square in the gird 
-                    Arrows: pushA  ; pushing all before starting 
-                    mov ah,01h; 
+                    Arrows:  mov ah,01h; 
                     int 16h; check if any key is pressed 
-                    jz Nopress
-                    mov ah,0h  ; empty the buffer if the key is pressed 
-                    int 16h
-                    jmp handlearrows
-                    Nopress: POPA   
-                    ;;;;
-                    JMP GAME
-            Handlearrows: ; is just checking if it is Currentcolor of the square is the same as flickering color ; Before moving i need to reset it to the original backgrnd color 
+                    jz SWITCHBLACK
+            HandlearrowsBlack: ; is just checking if it is Currentcolor of the square is the same as flickering color ; Before moving i need to reset it to the original backgrnd color 
                           ; so to make it short is just get the origin color from [chosenSquareColor]  and push it to the stack , so that DrawSquare procedure use it and draw the origin color square again  
-                          cmp [Currentcolor] , 0c08h ; 
-                          jnz COMP ;
-                          push AX; 
-                          mov cx , [Currentcolor] 
-                          sub cx , 0c00h;
-                          push cx ;
-                          mov cl , [chosenSquareColor]
-                          mov ch , 0ch ; 
-                          push cx ; 
-                          CALL DrawSquare
-                          add sp , 4h ;
-                          pop AX; 
+                           RevertFlickering
                           COMP:
                           cmp ah , 48h ; ascii for up
                           jz UP 
@@ -363,9 +431,12 @@ POP DX
                           jz RIGHT 
                           cmp ah , 4Bh;  ascii for left 
                           jz LEFT;
+                          cmp al, 61h
+                          jb MoveSquareBlack
+                          cmp al, 7ah
+                          jb SWITCHBLACK
                         exit:
-                          popA; 
-                          jmp MoveSquare;   
+                          jmp MoveSquareBlack;   
             ; in this part , i just move rowX and rowY variables according to the key pressed , also i make sure that the flickering color is not getting out of the grid 
             ; also i change the  chosenSquare number becuause it will be used again ;  
             UP:
@@ -373,30 +444,128 @@ POP DX
             jz exit ; 
             sub [rowX],19h; 25 pixel up 
             sub [chosenSquare], 8h ; the number decrease by 8h; 
-            popA
-            jmp MoveSquare;
+            jmp MoveSquareBlack;
             DOWN:
             cmp [rowX] , 0B0h;
             jz exit 
             add [rowX],19h;
             add [chosenSquare], 8h; the number of square increase by 8h;  
-            popA
-            jmp MoveSquare;
+            jmp MoveSquareBlack;
             LEFT :
             cmp [rowY] ,00h ; 
             jz exit ;
             sub [rowY],19h;
             sub [chosenSquare], 1h ;the number of square decrement by 1h;  
-            popA
-            jmp MoveSquare;
+            jmp MoveSquareBlack;
             RIGHT:
             cmp[rowY] ,  0AFh; 
             jz exit
             add [rowY],19h;
             add [chosenSquare], 1h ;  the number of square increase by 1h;  
-            popA
-            jmp MoveSquare;
-            
+            MoveSquareBlack:         ; this will the program main Loop    
+            CALL GetSquareColor ; get color in current rowx and rowy 
+            mov dl, [chosenSquareColor] ; color in the dx ; 
+            mov dh, 0h
+            mov [Currentcolor], dx
+            mov ah,0h  ; empty the buffer if the key is pressed 
+            int 16h
+
+SWITCHBLACK: mov di, OFFSET chosenSquare ; Source
+MOV [WhichTurn], di
+mov di, OFFSET chosenSquareBlack ; Destination
+MOV [WhichToExchange], di           
+CALL SwitchTurns
+
+mov di, OFFSET chosenSquareWhite ; Source
+MOV [WhichTurn], di
+mov di, OFFSET chosenSquare ; Destination
+MOV [WhichToExchange], di           
+CALL SwitchTurns
+mov [isItWhite], 1h
+
+cmp [FirstTime], 1h
+jnz FIRSTWHITETIME
+; First Time
+mov cl, [chosenSquare] ; it place where the flickers begins ; black king ;
+mov ch, 0h
+PUSH CX
+CALL SquaresCalculation
+add sp, 2h
+
+CALL GetSquareColor ; get color in current rowx and rowy 
+mov dl, [chosenSquareColor] ; color in the dx ; 
+mov dh, 0h
+mov [Currentcolor], dx
+
+
+; End Of First Time
+FIRSTWHITETIME: CALL GAME
+mov [FirstTime], 0h
+
+
+;;;;;;;;;;;;;;;;;;;;;; arrows Movement , this part is responsible for moving the flickering square in the gird 
+                    mov ah,01h; 
+                    int 16h; check if any key is pressed 
+                    jz SWITCHWHITE
+            handlearrowsWhite: ; is just checking if it is Currentcolor of the square is the same as flickering color ; Before moving i need to reset it to the original backgrnd color 
+                          ; so to make it short is just get the origin color from [chosenSquareColor]  and push it to the stack , so that DrawSquare procedure use it and draw the origin color square again  
+                           RevertFlickering
+                          cmp al , 77h ; ascii for up
+                          jz WUP 
+                          cmp al , 73h ; ascii for down 
+                          jz WDOWN 
+                          cmp al , 64h ;  ascii for right 
+                          jz WRIGHT 
+                          cmp al , 61h;  ascii for left 
+                          jz WLEFT;
+                          cmp al, 0dh
+                          jz SWITCHWHITE
+                          cmp ah, 48h
+                          jb MoveSquareWhite
+                          cmp ah, 50h
+                          jb SWITCHWHITE
+                        Wexit:
+                          jmp MoveSquareWhite;   
+            ; in this part , i just move rowX and rowY variables according to the key pressed , also i make sure that the flickering color is not getting out of the grid 
+            ; also i change the  chosenSquare number becuause it will be used again ;  
+            WUP:
+            cmp [rowX], 1h ; check if it is out of the grid
+            jz Wexit ; 
+            sub [rowX],19h; 25 pixel up 
+            sub [chosenSquare], 8h ; the number decrease by 8h; 
+            jmp MoveSquareWhite;
+            WDOWN:
+            cmp [rowX] , 0B0h;
+            jz Wexit 
+            add [rowX],19h;
+            add [chosenSquare], 8h; the number of square increase by 8h;  
+            jmp MoveSquareWhite;
+            WLEFT :
+            cmp [rowY] ,00h ; 
+            jz Wexit ;
+            sub [rowY],19h;
+            sub [chosenSquare], 1h ;the number of square decrement by 1h;  
+            jmp MoveSquareWhite;
+            WRIGHT:
+            cmp[rowY] ,  0AFh; 
+            jz Wexit
+            add [rowY],19h;
+            add [chosenSquare], 1h ;  the number of square increase by 1h;  
+            MoveSquareWhite:         ; this will the program main Loop    
+            CALL GetSquareColor ; get color in current rowx and rowy 
+            mov dl, [chosenSquareColor] ; color in the dx ; 
+            mov dh, 0h
+            mov [Currentcolor], dx
+            mov ah, 0h
+            int 16h
+
+SWITCHWHITE: mov di, OFFSET chosenSquare ; Source
+MOV [WhichTurn], di
+mov di, OFFSET chosenSquareWhite ; Destination
+MOV [WhichToExchange], di           
+CALL SwitchTurns
+JMP GAMELBLBlack
+
 ;mov ah , 0h ;
 ;mov al , 3h ;
 ;int 10h ;
@@ -498,7 +667,6 @@ DrawSquare      PROC
     mov bp, sp
     mov si, [bp+4] ; old background color 
     mov di, [bp+2] ; new color that will be drawn
-    mov [Currentcolor], di 
 
     mov cx, [rowY] ; colomn 
     mov dx, [rowX] ; row 
@@ -583,14 +751,554 @@ int 21h;
 RET ;
 closeFile ENDP;
 
-random proc 
-   mov al,xo
-   mul a
-   add ax,b
-   div [m]
-   mov [rand],ah
-   mov xo,ah
-RET;
-random ENDP
+ColorSelected       PROC
+
+mov di, [rowX]
+push di
+mov di, [rowY]
+push di
+
+mov cl, [numOfDirections]
+mov bx, 0h
+mov [DirectionCounter], 0h
+CALL ConHundred
+
+BeginColoring:      mov ch, [ArrayOfDirections+bx]
+                    add ch, [sourceSquare]
+INDIRECTION:        mov al, ch
+                    mov ah, 0h
+                    mov di, ax
+                    mov al, [Squares+di]
+                    dec al
+                    mov dl, 10h
+                    div dl
+                    mov ah, 0h
+                    XOR al, [isItWhite]
+                    cmp ax, 1h
+                    jnz CONTINUEdrawing
+                    cmp [ArrayOfDirections+bx], 0h
+                    jnz CONFIGURE
+
+                    CONTINUEdrawing:    push ax
+                    push cx
+                    mov ax, di
+                    sub al, [sourceSquare] ; Can be Optimized
+                    mov ah, [ArrayOfDirections+bx]
+                    push ax
+                    CALL OUTOFBORDER
+                    add sp, 2h
+
+                    cmp [GoToNext], 0h
+                    jz RESCONFIGURE
+                    push di ; Problematic. Very Problematic.
+                    CALL SquaresCalculation
+                    add sp, 2h
+                    pop cx
+                    mov bl, ch
+                    mov bh, 0h
+                    mov bl, [chessData+9500h+bx]
+                    mov di, bx
+                    push cx
+                    cmp [DESELECT], 1h
+                    jz DESELECTLBL
+
+                    mov ax, di
+                    mov bx, 0c35h
+                    jmp DRAW
+
+                    DESELECTLBL: mov ax, 35h
+                              mov bx, di
+                              mov bh, 0ch
+                              cmp ch, [destSquare]
+                              jnz DRAW
+                              mov [chosenSquareColor], bl
+
+                    DRAW: push ax
+                    push bx
+                    CALL DrawSquare
+                    add sp, 4h
+
+                    pop cx
+                    mov bx, [DirectionCounter]
+                    pop bp
+                    mov al, [ArrayOfRepetitions+bx]
+                    cmp al, 0h
+                    jz CONFIGURE
+                    cmp bp, 0h
+                    jz CONFIGURE
+                    add ch, [ArrayOfDirections+bx]
+                    inc [RepetionCounter]
+                    JMP INDIRECTION
+
+RESCONFIGURE:       pop cx
+                    pop bp
+
+CONFIGURE:          inc [DirectionCounter]
+                    mov bx, [DirectionCounter]
+                    mov ch, 0h
+                    mov [RepetionCounter], 1h
+                    cmp bx, cx
+                    jb BeginColoring
+
+cmp [DESELECT], 1h
+jz RESETLBL
+mov [chosenSquareColor], 35h
+RESETLBL:  pop di
+mov [rowY], di
+pop di
+mov [rowX], di
+RET
+ColorSelected ENDP
+
+OUTOFBORDER     PROC
+mov bp, sp
+
+mov dl, [NewSourceSquare]
+mov dh, 0h
+
+mov cl, [RepetionCounter]
+mov al, 2h
+mul cl
+mov cl, al
+
+mov ax, [bp + 2] ; First Two Hexadecimal is Indicator. The Second are the actual move
+cmp ah, 0h
+jz YES
+cmp ah , 0fh;   34an lao 2ayz 27rk el +16 to move down or up PAWN
+jl skip;
+add al ,2h; 
+skip:
+cmp ah ,0f1h  ; -16 ; 
+jg skip2  
+sub al , 2h; 
+skip2:
+cmp ah, 1h
+jz NOINC
+cmp ah, 0ffh
+jz NOINC
+cmp al, 0h
+jg increment
+sub al, cl
+jmp NOINC
+increment: add al, cl
+NOINC:      mov ah, 0h
+            add dx, ax
+            mov dh, 0h
+            cmp dx, 0bh
+            jb NO
+            cmp dx, 58h ; 88 decimal
+            ja NO
+            mov ax, dx
+            mov dx, 0h
+            mov bp, 0ah
+            div bp
+            cmp dx, 0h
+            jz NO
+            cmp dx, 09h
+            jz NO
+
+YES:   mov [GoToNext], 1h
+RET
+
+NO: mov [GoToNext], 0h
+RET
+OUTOFBORDER ENDP
+
+ConHundred      PROC
+
+mov al, [sourceSquare]
+mov ah, 0h
+mov dh, al
+mov dl, 08h
+div dl
+mov dl, 02h
+mul dl
+add dh, 0bh
+add dh, al
+mov [NewSourceSquare], dh
+
+RET
+ConHundred  ENDP
+
+RULES proc
+; ah ; Up/Down +8 ; al ; Up/Down + 16 ;
+; ch ; Diagonal ; +7 , -7h; 
+; cl ; Diagonal ; +9 , -9h; 
+mov [isItWhite], 0h;  
+mov bl , [chosenSquare] ; 
+mov bh , 0h; 
+cmp Squares[bx], 0h ;
+jz Quit 
+mov ah , 8h ;
+mov al , 10h;  
+mov ch , 7h;
+mov cl , 9h;   
+mov [numOfDirections] , 0h  ; 
+mov dl , Squares[bx]; 
+cmp dl , 9h; 
+Jb checkBlackOrNotWhitePawn
+cmp dl , 10h;  
+jA checkBlackOrNotWhitePawn; 
+jmp SetTheArrays; 
+checkBlackOrNotWhitePawn: cmp dl, 9h
+                          jb NotPawn
+cmp dl , 19h ; 
+jB NotPawnButBlack; 
+cmp dl , 20h; 
+jA NotPawnButBlack;
+mov [isItWhite] , 1h; 
+neg al;
+neg ah;
+neg ch;
+neg cl;
+SetTheArrays:
+push bx ;
+add bl , ah; 8h ;   
+cmp Squares[Bx] , 0h ;
+pop  bx;
+jnz setMoves;
+mov dl, [numOfDirections]; 
+mov dh ,0h ;
+mov di , dx;  
+mov ArrayOfDirections[di], ah; 
+mov ArrayOfRepetitions[di], 0h ; 
+inc [numOfDirections]; 
+;pop bx; 
+cmp [isItWhite] ,0h;
+jz White 
+cmp bl , 30h; 
+jb SetMoves
+cmp bl , 37h; 
+ja SetMoves; 
+jmp setInitial
+White:
+cmp bl , 8h ;  
+jb setMoves; 
+cmp bl , 0fh; 
+ja setMoves
+setInitial:
+;sub bl, ah ; 
+add bl, al ;
+cmp Squares[bx], 0h ; 
+jnz setMoves; 
+push bx ;
+mov bl, [numOfDirections]; 
+mov bh ,0h ; 
+mov ArrayOfDirections[bx], al; 
+mov ArrayOfRepetitions[bx], 0h ; 
+inc [numOfDirections]; 
+pop bx; 
+SetMoves:   
+pushA 
+mov ch , 0h ;  
+push cx ; 
+call CheckOpponent; 
+add sp ,2h ;
+popA
+pushA 
+xchg cl , ch ;
+mov ch , 0h ; 
+push cx ; 
+call CheckOpponent ; 
+add sp ,2h ;
+popA
+jmp SELECT
+;dec [numOfDirections]; 
+NotPawnButBlack:    sub dl, 10h
+                    mov [isItWhite], 1h
+NotPawn:        mov al, dl
+                mov ah, 0h
+                mov cl, 2h
+                div cl
+                cmp al, 0h
+                jz KING
+                add al, ah
+                KING:   mov cl, 11h; 17 bytes. One for count. Rest is for moves.
+                mul cl
+                mov bx, ax
+                mov al, [ArrayOfMoves+bx]
+                mov [numOfDirections], al
+                inc bx
+mov di, ax
+dec di
+LOADMOVES:      mov cx, WORD PTR [ArrayOfMoves+bx]
+                mov [ArrayOfDirections+di], cl
+                mov [ArrayOfRepetitions+di], ch
+                add bx, 2h
+                dec di
+                jns LOADMOVES
+   
+SELECT:     mov bl, [numOfDirections]
+            mov bh, 0h
+            mov [ArrayOfDirections+bx], 0h
+            mov [ArrayOfRepetitions+bx], 0h
+            xor [isItWhite], 1h
+            MOV [DESELECT], 0H
+            inc [numOfDirections]
+            CALL ColorSelected
+Quit: 
+RET
+RULES ENDP
+
+CheckOpponent proc ;; push the direction diagonal   
+mov bp , sp ; 
+mov cx , [bp+2]; direction 
+mov bl , [chosenSquare]; 
+mov bh, 0h ; 
+add bx , cx ; bx contain the new direction 
+mov bh , 0h ;
+cmp [isItWhite] , 0h ;  
+jnz Blackcheck ;
+mov dl , Squares[bx];  
+cmp dl , 11h;  
+jb NoMove
+cmp dl , 20h; 
+jA NoMove; 
+mov dl, [numOfDirections];
+mov dh ,0h;
+mov si , dx ; 
+mov ArrayOfDirections[si] , cl; 
+mov ArrayOfRepetitions[si],  0h ;
+inc [numOfDirections]; 
+Blackcheck:
+mov dl , Squares[bx];  
+cmp dl , 10h;  
+jA NoMove
+cmp dl , 1h ;
+jb NoMove
+mov dl, [numOfDirections];
+mov dh ,0h;
+mov si , dx ;  
+mov ArrayOfDirections[si] , cl; 
+mov ArrayOfRepetitions[si],  0h ;
+inc [numOfDirections]; 
+NoMove:
+RET 
+CheckOpponent endp 
+
+GAME    PROC
+          mov dx, [Currentcolor]
+          cmp dx, [Flicker] ; 15h is the color of the  flickering  
+          jnz flashColor ; if chosenSquarecolor not equal the flickering color ; 
+          mov al, [chosenSquareColor] ; 
+          mov ah, 0ch ;
+          jmp flashing;
+          flashColor:   mov ax, [Flicker]
+          add ax, 0c00h
+          flashing: dec [FlickeringTime]
+                    cmp [FlickeringTime], 0h
+                    jnz SourceCheck
+                    PUSH DX ; color of the current backgrnd;
+                    PUSH AX ; color that will be drawn; 
+                    CALL DrawSquare ; draw square 
+                    ; wait 1 second to flicker again 
+                    MOV CX, 2H
+                    MOV DX, 0000H
+                    MOV AH, 86H
+                    INT 15H       
+
+                    mov [FlickeringTime], 9h
+
+                    pop dx ; color that is drawn during last call of DrawSquare , will be used in the next loop    
+                    sub dx, 0c00h ; sub 0c because ax was 0c15 ;
+                    mov [Currentcolor], dx
+                    add sp, 2h ; free stack because i pushed dx and ax above ;
+
+;;;;;;;;;;;;;;;;;;;;;; Moving Pieces
+        ; selection begins when we press ENTER kay 
+        SourceCheck:    mov ah, 1H ;
+        int 16h
+        cmp al, [SelectionKey] ; ENTER KEY Ascii Code ; 
+        jnz FINISHGAME ; if its is not clicked  jmp to FINISHGAME (label below )
+        mov ah, 0H ;
+        int 16h
+        
+        
+        ;starting to locate sourceSquare and DestSquare 
+        mov bl, [chosenSquare] ; 
+        mov bh, 0h ; Move Current Square to BX
+        ;cmp Squares[bx], 0h ; Check if it is empty. Don't select.
+        ;jz FINISHGAME
+        cmp [sourceSquare], 0ffh ; if sourceSquare is 0ffh then it is not defined  yet  
+        jnz Dest
+        MOV AL, [Squares+bx]
+        mov ah, 0h
+        shl ax, 4H
+        XOR ah, [isItWhite]
+        jz FINISHGAME
+        ChangeSelected: mov al, [chosenSquare] ; chosend Square will be changed every arrow move (also it appears below ) 
+        mov [sourceSquare], al ; make sourceSquare equal to chosenSquare ,so when enter is pressed sourceSquare will be the chosenSquare 
+        RevertFlickering
+        MOV CL, [chosenSquareColor] ; the color if the current rowX and rowY , it is changing also every arrow press
+        mov ch, 0h
+        MOV [sourceSquareColor], cx ;
+        CALL RULES
+        mov cl, [chosenSquareColor]
+        mov ch, 0h
+        mov [Currentcolor], cx
+        jmp FINISHGAME
+
+        Dest:   
+        ; CALL RULES -------------------------------------------
+        mov [DESELECT], 1H
+        cmp [chosenSquareColor], 35h
+        jz GoToDest
+        mov bl, [chosenSquare]
+        mov bh, 0h
+        cmp [Squares+bx], 0h
+        jz IMPDES
+        MOV AL, [Squares+bx]
+        mov ah, 0h
+        shl ax, 4H
+        XOR ah, [isItWhite]
+        jnz selectNewPiece
+        IMPDES: CALL ColorSelected
+                MOV [sourceSquare], 0FFH
+                JMP FINISHGAME
+        selectNewPiece: CALL ColorSelected
+                        jmp ChangeSelected
+        GoToDest:   mov bl, [chosenSquare]  
+        mov [destSquare], bl ; setting desSquare after pressing the second ENTERKEY; 
+        cmp bl, [sourceSquare]; make sure SourceSquare not equal to DesSquare because the piece will be deleted if the ENTER is pressed twice on the same Square
+        jz FINISHGAME; jmp FINISHGAME if srcsqare == destsquare
+            ;Update Square ;
+        CALL ColorSelected
+        mov bl, [destSquare]
+        mov bh, 0h
+        cmp Squares[bx], 0h
+        jz NOKILL
+        mov al, Squares[bx]
+        cmp [isItWhite], 0h ; IsitWhite currently is the enemy not always.
+        jz WhiteEnemy
+        mov di, [numOfBlackDead]
+        mov [ArrayOfBlackDead+di], al
+        inc [numOfBlackDead]
+        jmp NOKILL
+        WhiteEnemy: mov di, [numOfWhiteDead]
+        mov [ArrayOfWhiteDead+di], al
+        inc [numOfWhiteDead]
+        NOKILL: mov ch , 0h ;
+        mov bh , 0h ;
+        mov bl , [sourceSquare] ;
+        mov cl , Squares[bx]
+        mov Squares[bx] , 0h;
+        mov bl ,[destSquare]
+        mov Squares[bx] , cl ;   
+        ; we are going to use Extra segment to to write to screen directly withtout using interupt 
+        mov ax, 0a000h ;  adress of graphics part in extra segment 
+        mov es, ax ;
+        mov ax, [rowX] ; 
+        mov [destX], ax ; setting the destX to the X of the currently selected square 
+        mov bx, [rowY] ; setting the destX to the Y of the currently selected square
+        add bx, 30h ; adding 30h grid shift ;
+        mov [destY], bx ;
+
+        PUSH AX ; destX;
+        push bx ; destY;
+        mov cl, [sourceSquare] ; 
+        mov ch, 0h
+        PUSH CX ; number of the source square ; 
+        CALL SquaresCalculation
+        add sp, 2h ; 
+        add [rowY], 30h ; shift 
+        pop bx
+        pop ax
+; this part we are trying to locate the offset of the pixel in the extra segment (rows* 320 + col ) ; each row contain 140h or 320d pixel 
+        mov cx, 140h 
+        mul cx ; multiplying cx * ax ; ax know is the destX ; 
+        add ax, bx ; adding to the colomn part ; bx know is the destY ; 
+        mov di, ax ; di know have the offset of the DestSquare pixel ;
+        ;rowX and rowY know holding the coordinates of the SourceSquare ;
+; also in this part we try to calcuate the offset if sourceSquare pixel in extra segment in the same way of destSquare  
+        mov ax, [rowX]
+        mov bx, [rowY]
+        mov cx, 140h
+        mul cx
+        add ax, bx
+        mov [sourceLocationInES], ax ; sourceLocationInES know holds the offset of the Sourcesquare pixel 
+        
+        mov cx, [sourceSquareColor] ; color of the background 
+        mov ch, 0dh
+        mov si, cx ; si color of the background  
+        
+        mov bl, 0h ; counter for the coloumns 
+        mov bp, [rowX]
+        add bp, 19h ; will be used in the nex loop just to compare if we reached the last row , loop will exit 
+        MOVEPIECE:      ;get color of the pixels in source Square  
+                        mov bh, 0h
+                        mov cx, [rowY]
+                        mov dx, [rowX]
+                        mov ah, 0dh
+                        int 10h
+
+                        cmp ax, si; if the pixel contain the same color of the background No copy will occure 
+                        jz NOCOPY
+                        STOSB ; store  es:di [location if the pixel of destination Square in extra segement] = AL [color of the pixel ]
+                        mov cx, di
+                        mov di, [sourceLocationInES] ; move the source Square pixel offset to start deleting the source square and move the piece  
+                        mov ax, si; si contain background color ; 
+                        STOSB ; es:di = al;
+                        mov di, cx ; return back the offest of di 
+                        JMP COPY
+; NOTE : AFTER STOSB di incremented automaticaly  
+                        NOCOPY: mov al, [chosenSquareColor]
+                        STOSB
+                        COPY: inc bl ; increment coloumn counter ;
+                        inc [sourceLocationInES] ; increment to move to the next pixel 
+                        inc [rowY] 
+                        cmp bl, 19h ; after 25d colomn i need to move to the next row ; 
+                        jnz MOVEPIECE
+                        mov bl, 0h
+                        ;navigate to the next row in es 
+                        sub DI, 19H; sub 25d --> number of colomns ; 
+                        add di, 140h ; add 320d to move to the next row in es ; NOTE : ES number the pixel in row as shown below  ; 
+                        ; p1 p2 p3 
+                        ; p4 p5 p6 
+                        ; operation that is done to DI is done to [sourceLocationInES]
+                        sub [sourceLocationInES], 19H ; 
+                        add [sourceLocationInES], 140h ;  
+                        sub [rowY], 19h ; decrement rowY ;  
+                        add [rowX], 1h ;  
+                        cmp [rowX], bp ; to check if we reached the the last Row or not 
+                        jz Reset 
+                        jmp MOVEPIECE
+
+
+; this part resets every thing for the next loop 
+Reset:  mov ax, [destX]
+mov [rowX], ax
+mov ax, [destY]
+sub ax, 30h
+mov [rowY], ax
+mov [sourceSquare], 0ffh
+mov [destSquare], 0ffh
+FINISHGAME: RET
+GAME    ENDP
+
+SwitchTurns     PROC
+
+mov di, [WhichTurn]
+mov bx, [WhichToExchange]
+mov cx, bx
+add cx, 19h
+
+TurnsLoopByte:  mov al, BYTE PTR[di]
+                mov BYTE PTR [bx], al
+                inc di
+                inc bx
+                cmp bx, cx
+                jnz TurnsLoopByte
+
+add cx, 0ah
+
+TurnsLoopWord:  mov ax, WORD PTR[di]
+                mov WORD PTR [bx], ax
+                add di, 2h
+                add bx, 2h
+                cmp bx, cx
+                jnz TurnsLoopWord
+
+RET
+SwitchTurns ENDP
 
 End main
