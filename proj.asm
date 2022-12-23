@@ -10,7 +10,7 @@ destY           dw        ?
 rowX            DW      ? ; coordinates SrcSquare 
 rowY            DW      ?
 sourceLocationInES     DW      ?
-TokenFile       db     'Coin.txt', 0h
+TokenFile       db     'outtkn1.bin', 0h
 
 Currentcolor    DW      ? 
 boardFile   db   'chess.bin', 0h; chess board 
@@ -35,7 +35,7 @@ a       db      25d
 b       dw      8d
 xo      db      30d
 rand    db      ?
-
+numberofmoves       db          ?
 
 chessData db  9C40h dup(?); all pixels in the grid in the start 
 
@@ -98,14 +98,8 @@ PlacePowerup    Macro   ;;this macro will be executed when the number of correct
     cmp Squares[bx],0H
     jnz Incorrect
     
-    ;;open image file
-    mov bx,5h;
-    mov cl,Squares[bx]
-    mov al,8h
-    mul cl
-    mov si,offset Pieces
-    add si,ax
-    mov byte ptr [si+7],0H
+
+    mov si,offset TokenFile
     mov cx,271H
     mov di,offset chessData
     push si
