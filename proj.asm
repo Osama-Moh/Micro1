@@ -241,8 +241,6 @@ PUSH CX
 PUSH BX
 CALL HandleFile
 ADD SP, 6H ; poping all pushed data to empty the stack 
-; closing file after loading data from it 
-CALL CloseFile
 ; after load pixels colors to chess data 
 ; we need to loop over the chessdata and draw each pixel using int 10h; 
 LEA bx , chessData
@@ -492,7 +490,7 @@ HandleFile      PROC
     PUSH DX
     push bx ; 
     CALL ReadData
-    CALL CloseFile
+    CALL closeFile
     pop bx;
 
     add sp, 4h ; emtpy stack 
