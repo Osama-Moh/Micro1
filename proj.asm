@@ -959,10 +959,10 @@ CheckOpponent endp
 GAME    PROC
           cmp [EnemySourceSquare], 0h
           jz NothingChosen
+          CALL GetSquareColor
           mov bl, [chosenSquareColor]
           cmp bl, [SelectColor]
           jz NothingChosen
-          CALL GetSquareColor
           mov bl, [chosenSquareColor]
           mov bh, 0h
           cmp bx, [Flicker]
@@ -1001,14 +1001,19 @@ GAME    PROC
         ; selection begins when we press ENTER kay 
         SourceCheck:    cmp [SELECTED], 1h
                         jnz SeeKeys
-                        cmp [EnemySourceSquare], 0h
+                        mov al, [SourceSquare]
+                        inc al
+                        NoProblem:  cmp [EnemySourceSquare], 0h
                         jz SeeKeys
-                        mov [DESELECT], 0h
+                        
+                        ConTHERE:   mov [DESELECT], 0h
                         mov [OrganizationSelector], 1h
                         CALL ColorSelected
                         mov [OrganizationSelector], 0h
+                        mov [EnemySourceSquare], al
+                        jmp KeysYa3m
         SeeKeys:    mov [EnemySourceSquare], 0h
-        mov ah, 1H ;
+        KeysYa3m:   mov ah, 1H ;
         int 16h
         cmp al, [SelectionKey] ; ENTER KEY Ascii Code ; 
         jnz FINISHGAME ; if its is not clicked  jmp to FINISHGAME (label below )
@@ -1085,7 +1090,9 @@ GAME    PROC
         WhiteEnemy: mov di, [numOfWhiteDead]
         mov [ArrayOfWhiteDead+di], al
         inc [numOfWhiteDead]
-        NOKILL: mov ch , 0h ;
+        NOKILL: mov al, [destSquare]
+        mov [EnemySourceSquare], al
+        mov ch , 0h ;
         mov bh , 0h ;
         mov bl , [sourceSquare] ;
         mov cl , Squares[bx]
