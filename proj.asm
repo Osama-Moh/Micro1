@@ -70,6 +70,15 @@ MovesFile   db   'moves.txt', 0h; file that contains moves
 DIRECTORY       DB      'D:\Pieces',0h ; 
 filehandle dw ?
 
+TokenFile       db     'outtkn1.bin', 0h
+
+m       db      64d
+a       db      25d
+b       dw      8d
+xo      db      30d
+rand    db      ?
+numberofmoves       db          ?
+
 Squares     DB     07h, 05h, 03h, 01h, 02h, 04h, 06h, 08h, 09h, 0ah, 0bh, 0ch, 0dh, 0eh, 0fh, 10h ; pieces order in the .txt files 
             DB     32 DUP(0h)
             DB     19h, 1ah, 1bh, 1ch, 1dh, 1eh, 1fh, 20h, 17h, 15h, 13h, 11h, 12h, 14h, 16h, 18h 
@@ -82,13 +91,6 @@ countY      DW    ?
 destX           dw        ? ; coordinates of destSquare 
 destY           dw        ?
 sourceLocationInES     DW      ?
-
-m       db      64d
-a       db      25d
-b       dw      8d
-xo      db      30d
-rand    db      ?
-numberofmoves       db          ?
 
 chessData db  9C40h dup(?); all pixels in the grid in the start 
 ; ------------------------------------ Problematic ----------------------------------------------------------
@@ -218,6 +220,45 @@ ColorsLoop:     cmp cx, 0h
 FINISHinsertion:    
 ENDM
 
+;;load file in the trialframes
+PlacePowerup    Macro   ;;this macro will be executed when the number of correct movements is equal to specific number
+    ;; it is call will be inside the movement process and it will have a value in the encoding to make the movement avaialble
+    Incorrect:
+    call random
+    cmp [rand],40H
+    JAE Incorrect
+    mov bl,rand
+    mov bh,0h        
+    cmp Squares[bx],0H
+    jnz Incorrect
+    
+
+    mov si,offset TokenFile
+    mov cx,271H
+    mov di,offset chessData
+    push si
+    push cx
+    push di
+    call HandleFile
+    add sp, 6H
+    mov byte ptr [si+7], 20h
+    push bx
+
+    mov al,[rand]
+    mov ah,0h
+    push ax
+    call SquaresCalculation 
+    pop ax
+    ADD SP, 2H 
+    MOV dx, [rowX]
+    PUSH dx
+    mov dx, [rowY]
+    push dx
+    Call DrawPiece
+    pop dx
+    pop dx
+ENDM
+
 .code
 main PROC far
 mov ax , @data ;
@@ -270,14 +311,6 @@ DrawInitialState
 mov ah , 0h ;
 int 16h ;
 
-;;;;;;;;;;;;;;;;;;;;;; 
-PlacePowerup
-;;;;;;;;;;;;;;;;;;;;;;;;
-
-mov ah , 0h ;
-int 16h ;
-
-
 mov cl, [chosenSquare] ; it place where the flickers begins ; black king ;
 mov ch, 0h
 PUSH CX
@@ -287,6 +320,8 @@ add sp, 2h
 CALL GetSquareColor ; get color in current rowx and rowy 
 mov dl, [chosenSquareColor] ; color in the dx ; 
 mov dh, 0h
+mov [Currentcolor], dx
+jmp SkipFirstTime
 
 GAMELBLBlack:
 mov di, OFFSET chosenSquareBlack ; Source
@@ -296,124 +331,6 @@ MOV [WhichToExchange], di
 CALL SwitchTurns
 mov [isItWhite], 0h
 SkipFirstTime:   CALL GAME
-
-                    pop dx ; color that is drawn during last call of DrawSquare , will be used in the next loop    
-                    sub dx, 0c00h ; sub 0c because ax was 0c15 ;
-                    add sp, 2h ; free stack because i pushed dx and ax above ;
-
-;;;;;;;;;;;;;;;;;;;;;; Moving Pieces
-        ; selection begins when we press ENTER kay 
-        mov ah, 1H ;
-        int 16h
-        cmp al, 0dh ; ENTER KEY Ascii Code ; 
-        jnz Arrows ; if its is not clicked  jmp to Arrows (label below )
-        ;starting to locate sourceSquare and DestSquare 
-        mov al, [sourceSquare] ; 
-        cmp al, 0ffh ; if sourceSquare is 0ffh then it is not defined  yet  
-        jnz Dest
-        mov al, [chosenSquare] ; chosend Square will be changed every arrow move (also it appears below ) 
-        mov [sourceSquare], al ; make sourceSquare equal to chosenSquare ,so when enter is pressed sourceSquare will be the chosenSquare 
-        MOV CL, [chosenSquareColor] ; the color if the current rowX and rowY , it is changing also every arrow press
-        MOV CH, 0H ;
-        PUSH CX ; so it is contain the color of the background "before" the last drawSquare call 
-        jmp Arrows
-
-        Dest:   
-        mov al, [chosenSquare]  
-        mov [destSquare], al ; setting desSquare after pressing the second ENTERKEY; 
-        cmp al, [sourceSquare]; make sure SourceSquare not equal to DesSquare because the piece will be deleted if the ENTER is pressed twice on the same Square
-        jz Arrows; jmp arrows if srcsqare == destsquare
-        ; we are going to use Extra segment to to write to screen directly withtout using interupt 
-        push dx ; color that is drawn in the last drawSquare call ; 
-        mov ax, 0a000h ;  adress of graphics part in extra segment 
-        mov es, ax ;
-        mov ax, [rowX] ; 
-        mov [destX], ax ; setting the destX to the X of the currently selected square 
-        mov bx, [rowY] ; setting the destX to the Y of the currently selected square
-        add bx, 30h ; adding 30h grid shift ;
-        mov [destY], bx ;
-
-        PUSH AX ; destX;
-        push bx ; destY;
-        mov cl, [sourceSquare] ; 
-        mov ch, 0h
-        PUSH CX ; number of the source square ; 
-        CALL SquaresCalculation
-        add sp, 2h ; 
-        add [rowY], 30h ; shift 
-        pop bx
-        pop ax
-; this part we are trying to locate the offset of the pixel in the extra segment (rows* 320 + col ) ; each row contain 140h or 320d pixel 
-        mov cx, 140h 
-        mul cx ; multiplying cx * ax ; ax know is the destX ; 
-        add ax, bx ; adding to the colomn part ; bx know is the destY ; 
-        mov di, ax ; di know have the offset of the DestSquare pixel ;
-        ;rowX and rowY know holding the coordinates of the SourceSquare ;
-; also in this part we try to calcuate the offset if sourceSquare pixel in extra segment in the same way of destSquare  
-        mov ax, [rowX]
-        mov bx, [rowY]
-        mov cx, 140h
-        mul cx
-        add ax, bx
-        mov [sourceLocationInES], ax ; sourceLocationInES know holds the offset of the Sourcesquare pixel 
-        
-        pop dx ; number of sourceSquare ;
-        pop cx ; color of the background 
-        push dx ; ; 
-        mov si, cx ; si color of the background  
-        
-        mov bl, 0h ; counter for the coloumns 
-        mov bp, [rowX]
-        add bp, 19h ; will be used in the nex loop just to compare if we reached the last row , loop will exit 
-        MOVEPIECE:      ;get color of the pixels in source Square  
-                        mov bh, 0h
-                        mov cx, [rowY]
-                        mov dx, [rowX]
-                        mov ah, 0dh
-                        int 10h
-
-                        mov ah, 0h
-                        cmp ax, si; if the pixel contain the same color of the background No copy will occure 
-                        jz NOCOPY
-                        STOSB ; store  es:di [location if the pixel of destination Square in extra segement] = AL [color of the pixel ]
-                        mov cx, di
-                        mov di, [sourceLocationInES] ; move the source Square pixel offset to start deleting the source square and move the piece  
-                        mov ax, si; si contain background color ; 
-                        STOSB ; es:di = al;
-                        mov di, cx ; return back the offest of di 
-                        JMP COPY
-; NOTE : AFTER STOSB di incremented automaticaly  
-                        NOCOPY: inc di ; if no copy done I need to move di to the next pixel 
-                        COPY: inc bl ; increment coloumn counter ;
-                        inc [sourceLocationInES] ; increment to move to the next pixel 
-                        inc [rowY] 
-                        cmp bl, 19h ; after 25d colomn i need to move to the next row ; 
-                        jnz MOVEPIECE
-                        mov bl, 0h
-                        ;navigate to the next row in es 
-                        sub DI, 19H; sub 25d --> number of colomns ; 
-                        add di, 140h ; add 320d to move to the next row in es ; NOTE : ES number the pixel in row as shown below  ; 
-                        ; p1 p2 p3 
-                        ; p4 p5 p6 
-                        ; operation that is done to DI is done to [sourceLocationInES]
-                        sub [sourceLocationInES], 19H ; 
-                        add [sourceLocationInES], 140h ;  
-                        sub [rowY], 19h ; decrement rowY ;  
-                        add [rowX], 1h ;  
-                        cmp [rowX], bp ; to check if we reached the the last Row or not 
-                        jz Reset 
-                        jmp MOVEPIECE
-
-
-; this part resets every thing for the next loop 
-Reset:  mov ax, [destX]
-mov [rowX], ax
-mov ax, [destY]
-sub ax, 30h
-mov [rowY], ax
-mov [sourceSquare], 0ffh
-mov [destSquare], 0ffh
-POP DX
 
 ;;;;;;;;;;;;;;;;;;;;;; arrows Movement , this part is responsible for moving the flickering square in the gird 
                     Arrows:  mov ah,01h; 
@@ -577,8 +494,6 @@ int 21h;
 hlt
 main ENDP
 
-
-
 ; In order for this procedure to work you have to put in DX the OFFSET of your file name variable
 OpenFile PROC
 mov ah , 3dh ;
@@ -660,6 +575,7 @@ DrawPiece     PROC  FAR ; To be noticed. May cause an error due to Jump Far
                     inc dx ;
                     cmp dx, [countY];
                     JNE piecesloop;
+
 RET
 DrawPiece   ENDP
 ;
@@ -1184,7 +1100,30 @@ GAME    PROC
         mov Squares[bx] , 0h;
         mov bl ,[destSquare]
         mov Squares[bx] , cl ;   
+
+        
+        inc numberofmoves;
+        cmp numberofmoves,2H        
+        jz power
+        jnz completeee
+
+        power:
+        pusha
+        mov cx,[rowX]
+        push cx
+        mov cx,[rowY]
+        push cx
+        PlacePowerup    
+        mov numberofmoves,0
+        pop cx
+        mov [rowY],cx
+        pop cx
+        mov [rowX],cX
+        popa
+
+
         ; we are going to use Extra segment to to write to screen directly withtout using interupt 
+        completeee:
         mov ax, 0a000h ;  adress of graphics part in extra segment 
         mov es, ax ;
         mov ax, [rowX] ; 
@@ -1300,5 +1239,15 @@ TurnsLoopWord:  mov ax, WORD PTR[di]
 
 RET
 SwitchTurns ENDP
+
+random proc 
+   mov al,xo
+   mul a
+   add ax,b
+   div [m]
+   mov [rand],ah
+   mov xo,ah
+RET;
+random ENDP
 
 End main
