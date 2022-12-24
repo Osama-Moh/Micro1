@@ -96,6 +96,15 @@ destX           dw        ? ; coordinates of destSquare
 destY           dw        ?
 sourceLocationInES     DW      ?
 
+KingW          db 0h  
+KingB          db 0h 
+BlackKingCheckMate db 0h ;
+WhiteKingCheckMate db 0h ;
+KingTobeChecked    db 0h ; 
+BlackWhiteFlag     db 1h ; 
+KnightCheckMate   db  ? ; 
+CHECKmsg          db  'CheckMate' , '$';  
+
 chessData db  9C40h dup(?); all pixels in the grid in the start 
 ; ------------------------------------ Problematic ----------------------------------------------------------
 
@@ -1181,7 +1190,8 @@ GAME    PROC
 
 
 ; this part resets every thing for the next loop 
-Reset:  mov ax, [destX]
+Reset:  CALL CheckMate
+mov ax, [destX]
 mov [rowX], ax
 mov ax, [destY]
 sub ax, 30h
@@ -1222,5 +1232,268 @@ TurnsLoopWord:  mov ax, WORD PTR[di]
 
 RET
 SwitchTurns ENDP
+
+CheckMate proc  
+; NOTE THIS FUNCTION search the positions of two  kings and put  them in  KingB and KingW positions  
+mov [BlackKingCheckMate] , 0h ;  
+mov [WhiteKingCheckMate] , 0h ;
+mov [BlackWhiteFlag] , 1h;  
+mov [RepetionCounter] , 1h ; 
+call PawnCheckMate ;
+mov al, [NewSourceSquare] ; 
+mov ah , [sourceSquare] ; 
+
+push ax;  
+cmp [BlackKingCheckMate] , 1h ; 
+jnz StartOtherPieces  
+WhiteKing:
+cmp [WhiteKingCheckMate] , 1h ;
+jz KingDead
+;KINGB pos blackKing 
+
+StartOtherPieces:
+
+cmp [WhiteKingCheckMate] , 1h ; 
+jz BlackKingTurn;
+mov bl , [Kingw]
+mov [sourceSquare], bl; 
+mov [KingTobeChecked]  , bl ;
+call ConHundred 
+; newsquare grid 
+StartQueen:
+mov bx , 12h ;
+mov [KnightCheckMate] ,22h;
+
+KingAll : mov [RepetionCounter] , 1h ;
+          mov dx  , Word PTR ArrayOfMoves[bx] ;  dl  mov , dh  repition
+          mov dh , dl;
+          InnerLoop:
+                push dx ; 
+                call OUTOFBORDER
+                pop dx ;
+                cmp [GoToNext] , 0h ; 
+                jz ProceedLoop
+                add dl , [KingTobeChecked];
+                mov cx ,dx ;   
+                mov ch , 0h ; 
+                mov di ,cx;
+                mov cl  , Squares[di];
+                cmp cl , 0h ; 
+                jz ProceedInnerLoop;
+                dec cl ; 
+                shr cl , 4 ;
+                Xor cl ,[BlackWhiteFlag] ;
+                Jz EnemyLBL ; 0h -> Enemy  
+                jmp ProceedLoop
+
+                EnemyLBL: 
+                sub dl ,[KingTobeChecked] ;
+                mov al , Squares[di] ; 
+                cmp al , 10h; 
+                jB SkipSub 
+                sub al , 10h ; 
+                SkipSub: 
+                mov cl ,2h ;
+                div cl ;
+                cmp al , 0h ; 
+                jz EnemyKing ; 
+                add al, ah   ;
+                EnemyKing:
+                cmp al , 4h ; 
+                jA ProceedLoop; 
+                mov ah , 0h  ;
+                mov cl , 11h ;
+                mul cl ; 
+                mov si ,ax ;
+                inc si ;
+                mov cx , si ; 
+                add cx , 10h ; 
+                        CanAttack: 
+                        mov ax  , word ptr ArrayOfMoves[si]; al ->mov , ah -> repeation
+                        cmp ax,0h ;  
+                        jz ProceedLoop
+                        cmp dh , al ;
+                        jnz ProceedCanAttack
+                        cmp dh , dl ; 
+                        jz CheckMateLBL 
+                        cmp ah , 1h ; 
+                        jz CheckMateLBL 
+                        jmp ProceedLoop   
+                        
+                        ProceedCanAttack:
+                        add si , 2h ; 
+                        cmp si , cx  ; 
+                        jnz CanAttack ; 
+                        jmp ProceedLoop;  
+                ProceedInnerLoop:
+                sub dl , [KingTobeChecked]; 
+                add dl , dh ;
+                inc [RepetionCounter];
+                cmp  Byte PTR ArrayOfMoves[bx+1] , 0h  ;  dl  mov , dh  repition
+                jz ProceedLoop
+                jmp InnerLoop
+          
+          ProceedLoop:   
+          add bx , 2h; 
+          cmp bl ,[KnightCheckMate]; 
+          jnz KingAll; 
+          cmp bx ,22h;
+          jnz KnightCheck
+          mov bx ,34h ;
+          mov [KnightCheckMate] , 44h; 
+          jmp KingAll
+
+          KnightCheck:  
+          cmp [BlackWhiteFlag] , 1h; 
+          jz BlackKingTurn ; 
+          jmp KingDead
+          
+          CheckMateLBL: 
+          cmp [BlackWhiteFlag] , 1h ; 
+          jz WhiteCheckMate
+          mov [BlackKingCheckMate] ,1h ;
+          jmp KingDead ;; TEMP
+          WhiteCheckMate: 
+          mov [WhiteKingCheckMate] , 1h ;
+          BlackKingTurn:
+          cmp [BlackKingCheckMate] ,1h ;
+          jz KingDead
+          
+          mov[BlackWhiteFlag] , 0h ;  
+          mov al , [KingB];
+          mov[KingTobeChecked], al ;
+          mov bl ,[sourceSquare] ; 
+          mov bh , 0h ; 
+          push bx ; 
+          mov [sourceSquare] , al;
+          call ConHundred ; 
+          pop bx  ;
+          mov [sourceSquare], bl ; 
+          jmp StartQueen;   
+
+KingDead: 
+pop ax  ; 
+mov [NewSourceSquare] , al ; 
+mov [sourceSquare], ah ;
+cmp [WhiteKingCheckMate] , 1h;  
+jnz BlackTEST  
+mov ah,2
+mov dx,011fh
+int 10h
+
+mov ah, 9
+mov dx, offset CHECKmsg
+int 21h
+BlackTEST :
+cmp [BlackKingCheckMate] , 1h; 
+jnz ENDTEST 
+mov ah,2
+mov dx,171fh
+int 10h;  
+mov ah, 9
+mov dx, offset CHECKmsg
+int 21h
+ENDTEST: 
+RET 
+CheckMate ENDP
+
+PawnCheckMate Proc
+mov bx , 0ffffh ; -1   
+SearchForTwoKings: 
+    inc bx ; 
+    mov dl , Squares[bx] ;
+    cmp dl , 11h ; 
+    jnz CheckWhiteKing; 
+    mov [KingB] , bl; 
+    CheckWhiteKing: 
+    cmp dl , 1h ; 
+    jnz CheckEnd; 
+    mov [KingW] , bl;
+    CheckEnd: 
+    cmp bx , 3fh ; 63 ;
+jnz SearchForTwoKings;
+; checkForPwn First for BlackKing ; 
+; -9 and -7 
+mov dl , [sourceSquare] ;
+mov dh , [NewSourceSquare] ; 
+push dx;
+
+mov ah , [KingB];  
+mov [sourceSquare],ah; 
+call ConHundred; 
+mov ax ,0F9F9h; -7 , 01  
+push ax ;  
+call OUTOFBORDER;
+add sp, 2h ; 
+cmp GoToNext, 0h ; 
+jz CheckSecondDiagonalB
+mov  bl , [KingB]; 
+add bl , 0F9h;
+mov bh, 0h ; 
+cmp Squares[bx] , 10h; 
+jA CheckSecondDiagonalB ;
+cmp Squares[bx]  , 9h; 
+jB CheckSecondDiagonalB ; 
+mov [BlackKingCheckMate] , 1h ; 
+jmp OtherPiecesCheck ; 
+
+CheckSecondDiagonalB: 
+mov ax ,0F7F7h; 
+push ax ;  
+call OUTOFBORDER;
+add sp, 2h ; 
+cmp GoToNext, 0h;
+jz OtherPiecesCheck;
+mov  bl , [KingB]; 
+add bl , 0F7h; -9 
+mov bh, 0h ; 
+cmp Squares[bx] , 10h; 
+jA OtherPiecesCheck ;
+cmp Squares[bx]  , 9h; 
+jB OtherPiecesCheck ; 
+mov [BlackKingCheckMate] , 1h ; 
+;;;;;;;;;;;ENd of BlackKingPawnCheck 
+; whitePawnCheck
+OtherPiecesCheck:
+mov ah , [Kingw];  
+mov [sourceSquare],ah; 
+call ConHundred; 
+mov ax ,0707h; 
+push ax ;  
+call OUTOFBORDER;
+add sp, 2h ; 
+cmp GoToNext, 0h  ; may cause a probelm , remember to return it the the original value 
+jz CheckSecondDiagonalW
+mov  bl , [Kingw]; 
+add bl , 07h;
+mov bh, 0h ; 
+cmp Squares[bx] , 19h; 
+jB CheckSecondDiagonalW ;
+cmp Squares[bx]  , 20h; 
+jA CheckSecondDiagonalW ; 
+mov [WhiteKingCheckMate] , 1h ; 
+jmp PawnCheckEND ; 
+CheckSecondDiagonalW: 
+mov ax ,0909h; 
+push ax ;  
+call OUTOFBORDER;
+add sp, 2h ; 
+cmp GoToNext, 0h  ; may cause a probelm , remember to return it the the original value 
+jz PawnCheckEND;
+mov  bl , [KingW]; 
+add bl , 09h;
+mov bh, 0h ; 
+cmp Squares[bx] , 19h; 
+jB PawnCheckEND ;
+cmp Squares[bx]  , 20h; 
+jA PawnCheckEND ; 
+mov [WhiteKingCheckMate] , 1h ; 
+
+PawnCheckEND: 
+    pop dx
+    mov [sourceSquare], dl ;
+    mov [NewSourceSquare] ,dh ;   
+    RET 
+PawnCheckMate ENDP 
 
 End main
