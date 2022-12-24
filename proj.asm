@@ -87,6 +87,7 @@ Pieces      DB    8h DUP(0), 0ffh DUP(0), 20h  ; empty 8 bytes , total 32* 8 -1 
 
 countX      DW    ?
 countY      DW    ?
+SelectColor db    35h
 
 destX           dw        ? ; coordinates of destSquare 
 destY           dw        ?
@@ -957,6 +958,9 @@ CheckOpponent endp
 
 GAME    PROC
           cmp [EnemySourceSquare], 0h
+          jz NothingChosen
+          mov bl, [chosenSquareColor]
+          cmp bl, [SelectColor]
           jz NothingChosen
           CALL GetSquareColor
           mov bl, [chosenSquareColor]
