@@ -18,6 +18,7 @@ sourceSquareColor   dw      ?
 rowX            DW      ? ; coordinates SrcSquare 
 rowY            DW      ?
 Flicker         dw      08h
+ColorCheck      dw      2h
 
 
 chosenSquareWhite    db     3H ; 
@@ -36,6 +37,7 @@ sourceSquareColorWhite   dw      ?
 rowXWhite            DW      ? ; coordinates SrcSquare 
 rowYWhite            DW      ?
 FlickerWhite         dw      31h
+ColorCheckWhite      dw      2h
 
 chosenSquareBlack    db     3bH ; 
 chosenSquareColorBlack   DB  ? ; 
@@ -53,6 +55,7 @@ sourceSquareColorBlack   dw      ?
 rowXBlack            DW      ? ; coordinates SrcSquare 
 rowYBlack            DW      ?
 FlickerBlack         dw      08h
+ColorCheckBlak      dw      2h
 
 ArrayOfWhiteDead             db      16 DUP(0h)
 numOfWhiteDead          dw      0h
@@ -957,20 +960,14 @@ RET
 CheckOpponent endp 
 
 GAME    PROC
-          cmp [EnemySourceSquare], 0h
-          jz NothingChosen
+          cmp [ColorCheck], 1h
+          jnz NothingChosen
           CALL GetSquareColor
           mov bl, [chosenSquareColor]
-          cmp bl, [SelectColor]
-          jz NothingChosen
-          mov bl, [chosenSquareColor]
           mov bh, 0h
-          cmp bx, [Flicker]
-          jnz NothingChosen
-          mov bl, [chosenSquare]
-          mov al, [chessData+9500h+bx]
-          mov [chosenSquareColor], al
-          NothingChosen:    mov dx, [Currentcolor]
+          mov [Currentcolor], bx
+          NothingChosen:    inc [ColorCheck]
+          mov dx, [Currentcolor]
           cmp dx, [Flicker] ; 15h is the color of the  flickering  
           jnz flashColor ; if chosenSquarecolor not equal the flickering color ; 
           mov al, [chosenSquareColor] ; 
@@ -1001,19 +998,14 @@ GAME    PROC
         ; selection begins when we press ENTER kay 
         SourceCheck:    cmp [SELECTED], 1h
                         jnz SeeKeys
-                        mov al, [SourceSquare]
-                        inc al
                         NoProblem:  cmp [EnemySourceSquare], 0h
                         jz SeeKeys
-                        
                         ConTHERE:   mov [DESELECT], 0h
                         mov [OrganizationSelector], 1h
                         CALL ColorSelected
                         mov [OrganizationSelector], 0h
-                        mov [EnemySourceSquare], al
-                        jmp KeysYa3m
         SeeKeys:    mov [EnemySourceSquare], 0h
-        KeysYa3m:   mov ah, 1H ;
+        mov ah, 1H ;
         int 16h
         cmp al, [SelectionKey] ; ENTER KEY Ascii Code ; 
         jnz FINISHGAME ; if its is not clicked  jmp to FINISHGAME (label below )
@@ -1092,6 +1084,7 @@ GAME    PROC
         inc [numOfWhiteDead]
         NOKILL: mov al, [destSquare]
         mov [EnemySourceSquare], al
+        mov [ColorCheck], 1h
         mov ch , 0h ;
         mov bh , 0h ;
         mov bl , [sourceSquare] ;
@@ -1210,7 +1203,7 @@ add si, 1ah
 mov [si], al
 inc di
 inc bx
-add cx, 0bh
+add cx, 0dh
 
 TurnsLoopWord:  mov ax, WORD PTR[di]
                 mov WORD PTR [bx], ax
