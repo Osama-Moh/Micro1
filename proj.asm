@@ -1000,6 +1000,13 @@ GAME    PROC
                         jnz SeeKeys
                         NoProblem:  cmp [EnemySourceSquare], 0h
                         jz SeeKeys
+                        mov al, [sourceSquare]
+                        inc al
+                        cmp [EnemySourceSquare], al
+                        jnz ConTHERE
+                        mov [DESELECT], 1h
+                        CALL ColorSelected
+                        jmp SeeKeys
                         ConTHERE:   mov [DESELECT], 0h
                         mov [OrganizationSelector], 1h
                         CALL ColorSelected
@@ -1083,6 +1090,7 @@ GAME    PROC
         mov [ArrayOfWhiteDead+di], al
         inc [numOfWhiteDead]
         NOKILL: mov al, [destSquare]
+        inc al
         mov [EnemySourceSquare], al
         mov [ColorCheck], 1h
         mov ch , 0h ;
