@@ -969,12 +969,21 @@ RET
 CheckOpponent endp 
 
 GAME    PROC
+          cmp [EnemySourceSquare], 0h
+          jnz Chosen
           cmp [ColorCheck], 1h
           jnz NothingChosen
+          Chosen:   mov bl, [chosenSquareColor]
+          push bx
           CALL GetSquareColor
+          pop ax
           mov bl, [chosenSquareColor]
           mov bh, 0h
-          mov [Currentcolor], bx
+          cmp bx, [Flicker]
+          jnz BeforeNothingChosen
+          mov [chosenSquareColor], al
+          jmp NothingChosen
+          BeforeNothingChosen:  mov [Currentcolor], bx
           NothingChosen:    inc [ColorCheck]
           mov dx, [Currentcolor]
           cmp dx, [Flicker] ; 15h is the color of the  flickering  
