@@ -12,6 +12,8 @@ destSquare      db      0FFH ; destination after movment
 FlickeringTime  db      1h
 SelectionKey    db      0dh
 SELECTED        db      0h
+entered        db      5 dup(0ffh)
+sizeEntered           db      0ffh
 EnemySourceSquare   db  0h
 Currentcolor    DW      5Ah 
 sourceSquareColor   dw      ?
@@ -31,6 +33,8 @@ destSquareWhite      db      0FFH ; destination after movment
 FlickeringTimeWhite  db      1h
 SelectionKeyWhite         db      71h
 SELECTEDWhite        db      0h
+enteredWhite        db      5 dup(0ffh)
+sizeEnteredWhite           db      0ffh
 EnemySourceSquareWhite   db  0h
 CurrentcolorWhite    DW      06h 
 sourceSquareColorWhite   dw      ?
@@ -49,6 +53,8 @@ destSquareBlack      db      0FFH ; destination after movment
 FlickeringTimeBlack  db      1h
 SelectionKeyBlack    db      0dh
 SELECTEDBlack        db      0h
+enteredBlack        db      5 dup(0ffh)
+sizeEnteredBlack           db      0ffh
 EnemySourceSquareBlack    db      0h
 CurrentcolorBlack    DW      5Ah 
 sourceSquareColorBlack   dw      ?
@@ -95,6 +101,12 @@ SelectColor db    35h
 destX           dw        ? ; coordinates of destSquare 
 destY           dw        ?
 sourceLocationInES     DW      ?
+
+a           db      25d
+xo          db      30d
+b           db      8d
+m           db      64d 
+rand        db      ?
 
 KingW          db 0h  
 KingB          db 0h 
@@ -969,6 +981,7 @@ RET
 CheckOpponent endp 
 
 GAME    PROC
+    
           cmp [EnemySourceSquare], 0h
           jnz Chosen
           cmp [ColorCheck], 1h
@@ -1215,7 +1228,7 @@ SwitchTurns     PROC
 mov di, [WhichTurn]
 mov bx, [WhichToExchange]
 mov cx, bx
-add cx, 1ah
+add cx, 20h
 
 TurnsLoopByte:  mov al, BYTE PTR[di]
                 mov BYTE PTR [bx], al
@@ -1504,5 +1517,251 @@ PawnCheckEND:
     mov [NewSourceSquare] ,dh ;   
     RET 
 PawnCheckMate ENDP 
+
+
+BatchModeFunc      PROC
+
+    mov [si], offset entered
+
+    cmp [sizeEntered], 0h
+    jge batchmode    
+
+    mov ah, 1h    ;;take the first char
+    int 16h
+    jz NoBatch
+    
+    cmp ah, 0bH      ;;compare if zero
+    jnz Black
+    mov al, 0h
+    jmp XORING
+    Black:  cmp ah, 52h
+            jnz CheckAbove    
+            mov al, 1h
+
+    XORING: xor [isItWhite], al
+    jnz FirstTimeBatch
+    jmp NoBatch
+
+    CheckAbove: cmp ah, 10h
+    jb EmptyBuffer
+    cmp al, 32h
+    jbe NoBatch
+    cmp ah, 48h
+    jb EmptyBuffer
+    cmp ah, 4BH
+    jbe NoBatch
+    EmptyBuffer:    mov ah, 0h    ;;empty the buffer
+    int 16h
+    jmp NoBatch
+
+;; case if the start is the end???    
+;; first check on the numbers that the value is inside the grid
+;; second eheck is that the start one is a self playerpiece 
+;; third check is that the target is a self player piece
+;; fourth check is that the start one is not empty
+;; fifth check is that the target one is an empty
+;; sixth check is that the target one is attack
+    
+    
+    ;;start of batch mode
+
+    FirstTimeBatch: inc [sizeEntered]    
+                    mov ah, 0H   ;; Empty Buffer
+                    int 16h
+    
+    batchmode: mov ah, 1h       ;;take char 
+    int 16h                              
+    jz NoBatch
+    cmp al, 30H     ;;sompare if zero
+    jz ResetBatch        ;;end batch mode
+
+    cmp ah, 0bH      ;;compare if zero
+    ja Black2
+    mov al, 0h
+    jmp XORING2
+    Black2:  cmp ah, 52h
+            ja CheckAbove    
+            mov al, 1h
+
+    XORING2: xor [isItWhite], al
+    jz NoBatch
+
+    mov ah, 0h
+    int 16h
+
+    mov ah, 2
+    mov dx, 17F0h
+    int 10h
+    mov dl, al
+    mov ah, 2
+    int 21h
+
+    sub al, 31h       ;;if else will subtract 31h ;; To be checked
+    mov bl, [sizeEntered]
+    mov bh, 0h
+    mov [si+bx], al    ;;put value in the array
+    inc [sizeEntered]
+    cmp [sizeEntered], 4H    ;;compare array sizeEntered to 4 since we need 4 numbers to execute
+    jz execute 
+    jmp NoBatch
+    
+    
+    execute:      ;; before execution reset every variable to be ready for the next iteration
+    mov dx,0
+    mov si,dx    
+    Call HandleBatchExecution
+    jmp NoBatch
+
+    ResetBatch: mov [sizeEntered], 0ffh
+    
+NoBatch:  
+    RET
+BatchModeFunc ENDP
+
+
+HandleBatchExecution    PROC
+;;first check
+    mov bx,0 
+    cmp entered[bx], 8
+    jZ forcedkill
+    
+    inc bx
+    cmp entered[bx],8
+    jZ forcedkill
+    
+    inc bx
+    cmp entered[bx],8
+    jZ forcedkill2
+    
+    inc bx
+    cmp entered[bx],8
+    jZ forcedkill2        
+    
+    ;;if first check is false
+    ;;calculate the square number 
+    mov bl,0
+    mov bh,0
+    mov si,0
+    mov al, entered[si]
+    mov bl, 8H
+    mul bl
+    inc si
+    mov ch,0
+    mov cl, entered[si]   
+    add ax,cx
+    ; add ax, entered[si] ; Not known
+    
+    mov [sourceSquare], al
+    inc si
+    
+    mov al, entered[si]
+    mov bl, 8H
+    mul bl
+    inc si
+    mov ch,0
+    mov cl, entered[si]
+    add ax, cx    
+    mov [destSquare], al
+    
+    mov cx, 0h
+    mov ax, 0h
+    mov bx, 0h
+    
+    ;;if source is empty kill piece 
+    mov bl, [sourceSquare]
+    mov al, [destSquare] ; No use
+    cmp Squares[bx], 0H
+    jz forcedkill
+    
+    ;;if source is the destination no effect
+    cmp ax, bx
+    jz goback
+    
+    ;;if same player or not
+    cmp [isItWhite], 1h
+    jz TryBlack
+    cmp squares[bx], 10H     ;;in this line I compared with the maximum piece value for the black or white (i don't know :] ) player
+    JBE forcedkill
+
+    TryBlack:   cmp squares[bx], 11H
+                JAE forcedkill
+
+    mov cl, [chessData+9D00h+bx]
+    mov [chosenSquareColor], cl
+    mov ch, 0h
+    mov [Currentcolor], cx
+    mov [chosenSquare], bl
+    push ax
+    CALL SquaresCalculation
+    CALL Game
+
+    pop bx
+    mov cl, [chessData+9D00h+bx]
+    mov [chosenSquareColor], cl
+    mov ch, 0h
+    mov [Currentcolor], cx
+    mov [chosenSquare], bl
+    push ax
+    CALL SquaresCalculation
+    CALL Game
+
+    jmp goback
+
+
+forcedkill:
+   Incorrect:
+    call random
+
+    CONTRAND:   mov bl, [rand]
+    mov bh,0h     
+
+    cmp Squares[bx], 0h
+    jz Incorrect
+
+    mov cl, Squares[bx]
+    dec cl
+    shr cl, 4h
+    XOR cl, [isItWhite]
+    jz Incorrect
+    
+
+    cmp Squares[bx], 1h
+    jz NOKINGWhite
+
+    cmp Squares[bx], 11h
+    jnz forcedkill2
+    jmp NOKINGBlack
+
+    NOKINGWhite:          cmp [numOfWhiteDead], 1fh
+                          jz forcedkill2
+                          jmp Incorrect
+
+    NOKINGBlack:          cmp [numOfBlackDead], 1fh
+                          jz forcedkill2
+                          jmp Incorrect
+
+
+
+forcedkill2:
+;;remove selected piece
+RET 
+
+goback:
+RET
+HandleBatchExecution    ENDP
+
+random proc    
+   cmp [xo], 0h
+   jnz CON     
+   mov al, [a]
+   mov [xo], al
+   CON: mov al, [xo]
+   mul a
+   add al, [b]
+   div [m]
+   mov [rand],ah
+   mov [xo],ah
+RET;
+random ENDP
 
 End main
