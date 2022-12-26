@@ -211,7 +211,7 @@ DrawInitialState     MACRO
                     dec di
                     jnz ParseMoves
 
-mov bx, OFFSET chessData+9500h
+mov bx, OFFSET chessData+9D00h
 mov cx, 0h
 mov dl, 8h
 ColorsLoop:     cmp cx, 0h
@@ -222,7 +222,7 @@ ColorsLoop:     cmp cx, 0h
                 DARK:   mov [bx], 06h
                 mov cx, 0h
                 CONTLOOP: inc bx
-                          cmp bx, OFFSET chessData+9540h
+                          cmp bx, OFFSET chessData+9D40h
                           jz FINISHinsertion
                           dec dl
                           jnz ColorsLoop
@@ -679,7 +679,7 @@ INDIRECTION:        mov al, ch
                     pop cx
                     mov bl, ch
                     mov bh, 0h
-                    mov bl, [chessData+9500h+bx]
+                    mov bl, [chessData+9D00h+bx]
                     mov di, bx
                     push cx
                     cmp [DESELECT], 1h
@@ -1056,7 +1056,7 @@ GAME    PROC
         ChangeSelected: mov bl, [chosenSquare] ; chosend Square will be changed every arrow move (also it appears below ) 
         mov [sourceSquare], bl ; make sourceSquare equal to chosenSquare ,so when enter is pressed sourceSquare will be the chosenSquare 
         mov bh, 0h
-        mov bl, [chessData+9500h+bx]
+        mov bl, [chessData+9D00h+bx]
         mov [sourceSquareColor], bx
         RevertFlickering
         CALL RULES
