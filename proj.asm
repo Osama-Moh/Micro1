@@ -78,6 +78,7 @@ b       dw      8d
 xo      db      30d
 rand    db      ?
 numberofmoves       db          ?
+constant    db      3
 
 Squares     DB     07h, 05h, 03h, 01h, 02h, 04h, 06h, 08h, 09h, 0ah, 0bh, 0ch, 0dh, 0eh, 0fh, 10h ; pieces order in the .txt files 
             DB     32 DUP(0h)
@@ -241,7 +242,6 @@ PlacePowerup    Macro   ;;this macro will be executed when the number of correct
     push di
     call HandleFile
     add sp, 6H
-    mov byte ptr [si+7], 20h
     push bx
 
     mov al,[rand]
@@ -660,12 +660,12 @@ GetSquareColor      PROC
     RET
 GetSquareColor ENDP
 
-closeFile proc;
+CloseFile proc;
 mov ah , 3eh;
 mov bx , [filehandle];
 int 21h;
 RET ;
-closeFile ENDP;
+CloseFile ENDP;
 
 ColorSelected       PROC
 
@@ -1028,13 +1028,12 @@ GAME    PROC
         jnz FINISHGAME ; if its is not clicked  jmp to FINISHGAME (label below )
         mov ah, 0H ;
         int 16h
-        
-        
         ;starting to locate sourceSquare and DestSquare 
         mov bl, [chosenSquare] ; 
         mov bh, 0h ; Move Current Square to BX
         ;cmp Squares[bx], 0h ; Check if it is empty. Don't select.
         ;jz FINISHGAME
+
         cmp [sourceSquare], 0ffh ; if sourceSquare is 0ffh then it is not defined  yet  
         jnz Dest
         MOV AL, [Squares+bx]
@@ -1078,6 +1077,8 @@ GAME    PROC
         cmp bl, [sourceSquare]; make sure SourceSquare not equal to DesSquare because the piece will be deleted if the ENTER is pressed twice on the same Square
         jz FINISHGAME; jmp FINISHGAME if srcsqare == destsquare
             ;Update Square ;
+        
+        
         CALL ColorSelected
         mov bl, [destSquare]
         mov bh, 0h
@@ -1093,7 +1094,27 @@ GAME    PROC
         WhiteEnemy: mov di, [numOfWhiteDead]
         mov [ArrayOfWhiteDead+di], al
         inc [numOfWhiteDead]
-        NOKILL: mov ch , 0h ;
+        NOKILL:
+        
+        mov al,[rand]
+        ;;mov bh,0          depug
+        ;;mov cl,Squares[bx]    depug
+        mov ah,[chosenSquare]
+        cmp al,ah
+        jz checktokin
+        jnz continue
+    
+        checktokin: 
+        cmp constant,1
+        JA executetokin
+        jz continue
+
+        executetokin: 
+        dec constant
+        mov al,[constant]
+        
+        continue: 
+        mov ch , 0h ;
         mov bh , 0h ;
         mov bl , [sourceSquare] ;
         mov cl , Squares[bx]
@@ -1101,9 +1122,10 @@ GAME    PROC
         mov bl ,[destSquare]
         mov Squares[bx] , cl ;   
 
-        
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
         inc numberofmoves;
-        cmp numberofmoves,2H        
+        cmp numberofmoves,01H        
         jz power
         jnz completeee
 
@@ -1201,7 +1223,7 @@ GAME    PROC
                         cmp [rowX], bp ; to check if we reached the the last Row or not 
                         jz Reset 
                         jmp MOVEPIECE
-
+            
 
 ; this part resets every thing for the next loop 
 Reset:  mov ax, [destX]
@@ -1249,5 +1271,24 @@ random proc
    mov xo,ah
 RET;
 random ENDP
+
+tokinexecute PROC
+    ;;mov al,[rand]
+    ;;mov ah,[sourcesqaure]
+    ;;cmp al,ah
+    ;;jz checktokin
+    ;;jnz continue
+    
+    ;;checktokin: 
+    ;;cmp constant,1
+    ;;JA executetokin
+    ;;jz continue
+
+    ;;executetokin 
+    ;;dec constant
+tokinexecute ENDP    
+
+
+
 
 End main
