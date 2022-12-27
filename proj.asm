@@ -3,6 +3,7 @@
 .stack 64
 .data
 chosenSquare    db     3BH ; To Whom is moving variables. Please note to move these variables togetherrrrrrrrrrrrrrrrr.
+TimerFlag db    0h; 
 chosenSquareColor   DB  ? ; 
 numOfDirections         db      0h ; Procedure Rules sets those variables according to the piece
 ArrayOfDirections       db      8 dup(0h), 0h ; Permissible moves for a piece
@@ -19,9 +20,9 @@ rowX            DW      ? ; coordinates SrcSquare
 rowY            DW      ?
 Flicker         dw      08h
 ColorCheck      dw      2h
-
-
+ 
 chosenSquareWhite    db     3H ; 
+TimerFlagWhite db    0h;
 chosenSquareColorWhite   DB  ? ; 
 numOfDirectionsWhite         db      0h ; Procedure Rules sets those variables according to the piece
 ArrayOfDirectionsWhite       db      8 dup(0h), 0h ; Permissible moves for a piece
@@ -40,6 +41,7 @@ FlickerWhite         dw      31h
 ColorCheckWhite      dw      2h
 
 chosenSquareBlack    db     3bH ; 
+TimerFlagBlack db    0h; 
 chosenSquareColorBlack   DB  ? ; 
 numOfDirectionsBlack         db      0h ; Procedure Rules sets those variables according to the piece
 ArrayOfDirectionsBlack       db      8 dup(0h), 0h ; Permissible moves for a piece
@@ -103,9 +105,18 @@ WhiteKingCheckMate db 0h ;
 KingTobeChecked    db 0h ; 
 BlackWhiteFlag     db 1h ; 
 KnightCheckMate   db  ? ; 
-CHECKmsg          db  'CheckMate' , '$';  
-
-chessData db  9C40h dup(?); all pixels in the grid in the start 
+CHECKmsg          db  'Check' , '$';  
+;--------------------------timer------------------------------------
+time_left dB 64 dup(0)
+ready_to_move dB  64 dup(1)
+locked_squared DB   64 dup(0);
+time_penalty   dB 99h
+ChosenSquareTimer db 0 ; 
+one    db 'one.bin', 0H
+two    dB   'two.bin', 0H
+three    dB   'three.bin', 0H
+chessData db  9C40h dup(?); all pixels in the grid in the start ;
+imagedata db 625 dup(?);
 ; ------------------------------------ Problematic ----------------------------------------------------------
 
 RevertFlickering    MACRO
@@ -1050,6 +1061,17 @@ GAME    PROC
         mov bl, [chessData+9500h+bx]
         mov [sourceSquareColor], bx
         RevertFlickering
+
+            ;mov bh,0 
+            ;mov bl,[chosenSquare]   
+           ;; lea si, locked_squared    
+            ;mov ah,2ch ; dh second ;
+            ;int 21h
+            ;cmp  dh,[locked_squared][bx]
+            ;jle FINISHGAME 
+            ;mov [locked_squared][bx],0
+
+
         CALL RULES
         mov cl, [chosenSquareColor]
         mov ch, 0h
@@ -1057,6 +1079,7 @@ GAME    PROC
         jmp FINISHGAME
 
         Dest:   
+        
         ; CALL RULES -------------------------------------------
         mov [DESELECT], 1H
         mov al, 1h
@@ -1110,6 +1133,19 @@ GAME    PROC
         mov bl ,[destSquare]
         mov Squares[bx] , cl ;   
         ; we are going to use Extra segment to to write to screen directly withtout using interupt 
+                ;--------------------------timer call------------------------------------
+        pusha
+        
+        mov bh,0
+        mov bl,[chosenSquare]
+        mov ah,2ch
+        int 21h; dh contain the time in seconds
+
+        mov locked_squared[bx],dh
+        mov[chosenSquareTimer], bl; 
+        popa
+        ;--------------------------------------------------------------
+
         mov ax, 0a000h ;  adress of graphics part in extra segment 
         mov es, ax ;
         mov ax, [rowX] ; 
@@ -1155,7 +1191,7 @@ GAME    PROC
                         mov dx, [rowX]
                         mov ah, 0dh
                         int 10h
-
+                       
                         cmp ax, si; if the pixel contain the same color of the background No copy will occure 
                         jz NOCOPY
                         STOSB ; store  es:di [location if the pixel of destination Square in extra segement] = AL [color of the pixel ]
@@ -1198,7 +1234,112 @@ sub ax, 30h
 mov [rowY], ax
 mov [sourceSquare], 0ffh
 mov [destSquare], 0ffh
-FINISHGAME: RET
+
+FINISHGAME: 
+    mov bx , 0h ;
+    mov ax , [rowX]; 
+    mov cx , [rowY]; 
+    mov dl , [chosenSquare];
+    mov dh, [chosenSquareColor] ; 
+    push ax; 
+    push cx ;  
+    push dx ; 
+    LoopLockedSquared:    
+        pushA 
+        mov [chosenSquare] , bl; 
+        push bx ; 
+        call SquaresCalculation; 
+        add sp ,2h;
+        call GetSquareColor;  
+
+
+        cmp locked_squared[bx], 0h ;
+        jz  FinishTimer 
+
+        mov ah , 2ch ; 
+        int 21h ; 
+        mov cl , locked_squared[bx] ; 
+        sub dh , cl ;
+        cmp dh , 1h ; 
+        jA comp1
+        cmp [TimerFlag] , 1h; 
+        jz FinishTimer
+
+        mov [TimerFlag] , 1h ; 
+
+        pushA
+        mov si , offset one ;
+        push si ;
+        call DrawNumbers; 
+        pop si 
+        popA ; 
+
+        jmp FinishTimer
+        comp1:
+
+        mov ah , 2ch ; 
+        int 21h ; 
+        mov cl , locked_squared[bx] ; 
+        sub dh , cl ; 
+        cmp dh , 2h ; 
+        jA comp2
+
+        cmp [TimerFlag] , 2h; 
+        jz FinishTimer
+
+        mov [TimerFlag] , 2h ; 
+
+        pushA 
+        call DeleteNumber;
+        mov si , offset two ; 
+        push si
+        call DrawNumbers; 
+        pop si
+        popA 
+
+        jmp FinishTimer
+        comp2:
+        mov ah , 2ch ; 
+        int 21h ; 
+        mov cl , locked_squared[bx] ; 
+        sub dh , cl ; 
+        cmp dh , 3h ; 
+        jA comp3
+
+        cmp [TimerFlag] , 3h; 
+        jz FinishTimer
+
+        mov [TimerFlag] , 3h ; 
+
+        pushA 
+        call DeleteNumber;
+        mov si , offset three ; 
+        push si 
+        call DrawNumbers; 
+        pop si 
+        popA 
+
+        jmp FinishTimer
+        comp3:
+        mov locked_squared[bx], 0h;
+        call DeleteNumber; 
+        mov [TimerFlag],0h ;
+        FinishTimer: 
+        popA
+        inc bx ; 
+        cmp bx , 64d ;
+        jnz LoopLockedSquared
+        
+        pop dx ;
+        pop cx ; 
+        pop ax;         
+         mov [chosenSquare] , dl ;
+         mov [chosenSquareColor], dh; 
+        mov [rowX] , ax ;
+        mov [rowY], cx; 
+
+
+        RET
 GAME    ENDP
 
 SwitchTurns     PROC
@@ -1206,7 +1347,7 @@ SwitchTurns     PROC
 mov di, [WhichTurn]
 mov bx, [WhichToExchange]
 mov cx, bx
-add cx, 1ah
+add cx, 1bh
 
 TurnsLoopByte:  mov al, BYTE PTR[di]
                 mov BYTE PTR [bx], al
@@ -1494,6 +1635,83 @@ PawnCheckEND:
     mov [sourceSquare], dl ;
     mov [NewSourceSquare] ,dh ;   
     RET 
-PawnCheckMate ENDP 
+PawnCheckMate ENDP
+
+LoadSquareDate proc 
+pushA
+
+mov bl , [chosenSquare]; 
+mov bh  , 0h ; 
+mov cl, Squares[bx] ; accessing number of the piece in the file from Square Variable
+cmp cl, 0H ; compare to zero because if cl is zero then no piece will be drawn 
+jz LeaveSquare
+mov al, 08h ; mov al 8 , because as said before each has 8 bytes , so i need reach the begining of the file name in the [Pieces] variable  
+mul cl ; 8 * cl to know exaclty how many bytes I should move 
+mov si, offset Pieces  
+add si, ax ; si know points the the head name 
+mov byte ptr [si + 7], 0h ; adding zero at the end of the file name to be able to read the name by the interrupt 
+;;;MOV DX, OFFSET firstState
+MOV CX, 271H  ; 25d * 25d --> total number of pixel in each square 
+MOV DI, OFFSET chessData ; will be using this to load the pixel colors from the .bin file to it; 
+PUSH SI ; file name 
+PUSH CX ; number of bytes 
+PUSH DI ; place to write to the data in the memory 
+CALL HandleFile ; explained below 
+ADD SP, 6H ; free stack 
+mov byte ptr [si + 7], 20h ; m4 faker yasta kona 3amleeeno leeh XD , bs seebo talma 46al 
+
+popA
+LeaveSquare:
+RET
+LoadSquareDate ENDP 
+
+DrawNumbers proc ; Make SI filehandle
+ ;lea si, [filename]
+   
+    mov bp , sp ;  
+    mov si ,[bp+2];
+    mov cx,271H
+    mov di,offset chessData;
+    push si
+    push cx
+    push di
+    call HandleFile
+    add sp, 6H
+    
+    MOV dx,[rowX]
+    PUSH dx
+    mov dx,[rowY]
+    push dx
+    call DrawPiece
+    add sp ,4h; 
+
+    RET
+DrawNumbers endp
+
+DeleteNumber proc 
+     
+ mov bx, 04h
+    mov al, [chosenSquareColor]
+    mov ah, 0ch
+    push bx 
+    push ax
+    CALL DrawSquare
+    add sp, 4h
+    mov al, [chosenSquareColor]
+    mov ah,0
+    ;mov [Currentcolor], ax
+    
+
+    call LoadSquareDate; 
+
+    MOV dx,[rowX]
+    PUSH dx
+    mov dx,[rowY]
+    push dx
+    call DrawPiece
+    add sp ,4h; 
+    
+RET 
+DeleteNumber endp 
 
 End main
