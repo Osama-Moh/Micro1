@@ -1,4 +1,67 @@
 .286
+
+showmain Macro message1,message2,message3
+    pusha
+    mov ax,0003h
+    int 10h    
+    
+    mov ah,2h
+    mov dl,10
+    mov dh,5
+    int 10h  
+    
+    mov ah,9h
+    mov dx,offset message1
+    int 21h
+    
+    mov ah,2h
+    mov dl,10
+    mov dh,7
+    int 10h
+    
+    mov ah,9h
+    mov dx,offset message2
+    int 21h
+    
+    mov ah,2h
+    mov dl,10
+    mov dh,9
+    int 10h
+    
+    mov ah,9h
+    mov dx,offset message3
+    int 21h
+    popa
+ENDM
+
+
+printnotification MACRO message123
+    mov ah,2h
+    mov dl,2d
+    mov dh,23d
+    int 10h  
+    
+    mov ah,9h
+    mov dx,offset message123
+    int 21h
+ENDM
+
+printline MACRO
+    pusha 
+    LOCAL middle11
+    mov ah,2                    ;; print the line of the notify bar
+    mov dl,0d
+    mov dh,22d
+    int 10h   
+    mov cx,80    
+    middle11:         
+    mov ah,2 
+    mov dl,'-'
+    int 21h
+    loop middle11
+    popa
+ENDM    
+
 .model small
 .stack 64
 .data
@@ -92,6 +155,16 @@ countY      DW    ?
 destX           dw        ? ; coordinates of destSquare 
 destY           dw        ?
 sourceLocationInES     DW      ?
+
+message1        db       'To Start Chatting Press F1','$'
+message2        db       'To Start the game Press F2','$'
+message3        db       'To End The Program Press ESC','$'
+chatmessage     db       'Chat mode','$'
+gamemode        db       'Gamemode','$'
+waitchatmes     db       'There is a chat invitation. If you want to accept it click f1','$'
+waitplaymes     db       'There is a game invitation. If you want to accept it click f2','$'   
+dashes          db       '-','$'
+;;end             db       'The Program has been ended','$'
 
 chessData db  9C40h dup(?); all pixels in the grid in the start 
 ; ------------------------------------ Problematic ----------------------------------------------------------
@@ -222,16 +295,16 @@ FINISHinsertion:
 ENDM
 
 ;;load file in the trialframes
-PlacePowerup    Macro   ;;this macro will be executed when the number of correct movements is equal to specific number
+PlacePowerup1    Macro   ;;this macro will be executed when the number of correct movements is equal to specific number
     ;; it is call will be inside the movement process and it will have a value in the encoding to make the movement avaialble
-    Incorrect:
+    Incorrect111:
     call random
     cmp [rand],40H
     JAE Incorrect
     mov bl,rand
     mov bh,0h        
     cmp Squares[bx],0H
-    jnz Incorrect
+    jnz Incorrect111
     
 
     mov si,offset TokenFile
@@ -264,6 +337,77 @@ main PROC far
 mov ax , @data ;
 mov ds , ax ;
 ; setting directory to read files 
+ 
+mov ax,0003h                ;; clear the screen
+int 10h    
+        
+again:
+    
+showmain message1,message2,message3
+;;printline    
+    
+incorrect:
+mov ah,0h    
+int 16h
+push ax
+pop ax
+    
+;;cmp ah,01h                  ;; end program
+;;jz finish
+    
+cmp ah,3bH                  ;; check chat
+jz Chat
+    
+cmp ah,3ch                  ;; check game                                        
+jz play
+
+jnz incorrect               
+
+chat:
+printnotification waitchatmes    
+incorrect2:
+mov ah,0h
+int 16h
+cmp ah,3bh
+jnz incorrect2    
+mov ax,0003h
+int 10h
+mov ah,9
+mov dx, offset chatmessage
+int 21h
+;;printline
+waitchat:
+mov ah,0h
+int 16h  
+cmp ah,3dh
+jnz waitchat
+jz again
+        
+play:
+printnotification waitplaymes
+incorrect1:
+mov ah,0h
+int 16h
+cmp ah,3ch
+jnz incorrect1
+jmp letsstart
+;;mov ax,0003h
+;;int 10h
+;;mov ah,9
+;;mov dx, offset gamemode
+;;int 21h    
+;;printline
+waitplay:
+mov ah,0h
+int 16h  
+cmp ah,3dh
+jnz waitplay
+jz again
+
+
+
+;;;;;;;;;;;;;;;;;
+letsstart:
 MOV AH, 3BH
 MOV DX, OFFSET DIRECTORY
 INT 21H
@@ -1125,7 +1269,7 @@ GAME    PROC
 
         ;;increment total number of moves and make a comparison with a constant number to draw the powerup after it
         inc numberofmoves;
-        cmp [numberofmoves],01H        
+        cmp [numberofmoves],02H        
         jz power
         jnz completeee
 
@@ -1135,7 +1279,7 @@ GAME    PROC
         push cx
         mov cx,[rowY]
         push cx
-        PlacePowerup    
+        PlacePowerup1    
         mov numberofmoves,0
         pop cx
         mov [rowY],cx
