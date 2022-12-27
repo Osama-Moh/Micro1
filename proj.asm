@@ -841,7 +841,7 @@ RULES proc
 ; ch ; Diagonal ; +7 , -7h; 
 ; cl ; Diagonal ; +9 , -9h; 
 mov [isItWhite], 0h;  
-mov bl , [chosenSquare] ; 
+mov bl , [chosenSquare] ;       //empty chosen square
 mov bh , 0h; 
 cmp Squares[bx], 0h ;
 jz Quit 
@@ -1058,6 +1058,8 @@ GAME    PROC
         mov [DESELECT], 1H
         cmp [chosenSquareColor], 35h
         jz GoToDest
+        cmp [chosenSquareColor],0h
+        jz GoToDest
         mov bl, [chosenSquare]
         mov bh, 0h
         cmp [Squares+bx], 0h
@@ -1095,17 +1097,15 @@ GAME    PROC
         mov [ArrayOfWhiteDead+di], al
         inc [numOfWhiteDead]
         NOKILL:
-        
+        ;; where the execution of powerup will occur
         mov al,[rand]
-        ;;mov bh,0          depug
-        ;;mov cl,Squares[bx]    depug
         mov ah,[chosenSquare]
         cmp al,ah
         jz checktokin
         jnz continue
     
         checktokin: 
-        cmp constant,1
+        cmp [constant],1
         JA executetokin
         jz continue
 
@@ -1123,9 +1123,9 @@ GAME    PROC
         mov Squares[bx] , cl ;   
 
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+        ;;increment total number of moves and make a comparison with a constant number to draw the powerup after it
         inc numberofmoves;
-        cmp numberofmoves,01H        
+        cmp [numberofmoves],01H        
         jz power
         jnz completeee
 
@@ -1271,24 +1271,5 @@ random proc
    mov xo,ah
 RET;
 random ENDP
-
-tokinexecute PROC
-    ;;mov al,[rand]
-    ;;mov ah,[sourcesqaure]
-    ;;cmp al,ah
-    ;;jz checktokin
-    ;;jnz continue
-    
-    ;;checktokin: 
-    ;;cmp constant,1
-    ;;JA executetokin
-    ;;jz continue
-
-    ;;executetokin 
-    ;;dec constant
-tokinexecute ENDP    
-
-
-
 
 End main
