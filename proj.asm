@@ -3,6 +3,7 @@
 .stack 64
 .data
 chosenSquare    db     3BH ; To Whom is moving variables. Please note to move these variables togetherrrrrrrrrrrrrrrrr.
+TimerFlag db    0h; 
 chosenSquareColor   DB  ? ; 
 numOfDirections         db      0h ; Procedure Rules sets those variables according to the piece
 ArrayOfDirections       db      8 dup(0h), 0h ; Permissible moves for a piece
@@ -24,6 +25,7 @@ ColorCheck      dw      2h
 
 
 chosenSquareWhite    db     3H ; 
+TimerFlagWhite db    0h;
 chosenSquareColorWhite   DB  ? ; 
 numOfDirectionsWhite         db      0h ; Procedure Rules sets those variables according to the piece
 ArrayOfDirectionsWhite       db      8 dup(0h), 0h ; Permissible moves for a piece
@@ -44,6 +46,7 @@ FlickerWhite         dw      31h
 ColorCheckWhite      dw      2h
 
 chosenSquareBlack    db     3bH ; 
+TimerFlagBlack db    0h; 
 chosenSquareColorBlack   DB  ? ; 
 numOfDirectionsBlack         db      0h ; Procedure Rules sets those variables according to the piece
 ArrayOfDirectionsBlack       db      8 dup(0h), 0h ; Permissible moves for a piece
@@ -102,11 +105,24 @@ destX           dw        ? ; coordinates of destSquare
 destY           dw        ?
 sourceLocationInES     DW      ?
 
-a           db      25d
-xo          db      30d
-b           db      8d
-m           db      64d 
-rand        db      ?
+TokenFile       db     'outtkn1.bin', 0h
+
+m       db      64d
+a       db      25d
+b       dw      8d
+xo      db      30d
+rand    db      ?
+numberofmoves       db          ?
+freezingtime        db      3h
+
+
+message1        db       'To Start Chatting Press F1','$'
+message2        db       'To Start the game Press F2','$'
+message3        db       'To End The Program Press ESC','$'
+chatmessage     db       'Chat mode','$'
+waitchatmes     db       'There is a chat invitation. If you want to accept it click f1','$'
+waitplaymes     db       'There is a game invitation. If you want to accept it click f2','$'   
+endmessage             db       'The Program has been ended','$'
 
 KingW          db 0h  
 KingB          db 0h 
@@ -115,10 +131,101 @@ WhiteKingCheckMate db 0h ;
 KingTobeChecked    db 0h ; 
 BlackWhiteFlag     db 1h ; 
 KnightCheckMate   db  ? ; 
-CHECKmsg          db  'CheckMate' , '$';  
+CHECKmsg          db  'Check' , '$';  
+;--------------------------timer------------------------------------
+time_left dB 64 dup(0)
+ready_to_move dB  64 dup(1)
+locked_squared DB   64 dup(0);
+time_penalty   dB 99h
+ChosenSquareTimer db 0 ; 
+one    db 'one.bin', 0H
+two    dB   'two.bin', 0H
+three    dB   'three.bin', 0H
+imagedata db 625 dup(?);
 
 chessData db  9C40h dup(?); all pixels in the grid in the start 
 ; ------------------------------------ Problematic ----------------------------------------------------------
+
+showmain Macro message1,message2,message3
+    pusha
+    mov ax,0003h
+    int 10h    
+    
+    mov ah,2h
+    mov dl,10
+    mov dh,5
+    int 10h  
+    
+    mov ah,9h
+    mov dx,offset message1
+    int 21h
+    
+    mov ah,2h
+    mov dl,10
+    mov dh,7
+    int 10h
+    
+    mov ah,9h
+    mov dx,offset message2
+    int 21h
+    
+    mov ah,2h
+    mov dl,10
+    mov dh,9
+    int 10h
+    
+    mov ah,9h
+    mov dx,offset message3
+    int 21h
+    popa
+ENDM
+
+printnotification MACRO message123
+    mov ah,2h
+    mov dl,2d
+    mov dh,23d
+    int 10h  
+    
+    mov ah,9h
+    mov dx,offset message123
+    int 21h
+ENDM
+
+PlacePowerup1    Macro   ;;this macro will be executed when the number of correct movements is equal to specific number
+    ;; it is call will be inside the movement process and it will have a value in the encoding to make the movement avaialble
+    Incorrect12:
+    call random
+    cmp [rand],40H
+    JAE Incorrect12
+    mov bl,rand
+    mov bh,0h        
+    cmp Squares[bx],0H
+    jnz Incorrect12
+    
+    mov si,offset TokenFile
+    mov cx,271H
+    mov di,offset chessData
+    push si
+    push cx
+    push di
+    call HandleFile
+    add sp, 6H
+    push bx
+
+    mov al,[rand]
+    mov ah,0h
+    push ax
+    call SquaresCalculation 
+    pop ax
+    ADD SP, 2H 
+    MOV dx, [rowX]
+    PUSH dx
+    mov dx, [rowY]
+    push dx
+    Call DrawPiece
+    pop dx
+    pop dx
+ENDM
 
 RevertFlickering    MACRO
 LOCAL FINISHLBL
@@ -248,6 +355,78 @@ ENDM
 main PROC far
 mov ax , @data ;
 mov ds , ax ;
+
+mov ax,0003h                ;; clear the screen
+int 10h    
+        
+again:
+    
+showmain message1,message2,message3
+;;printline    
+    
+incorrect:
+mov ah,0h    
+int 16h
+push ax
+pop ax
+    
+;;cmp ah,01h                  ;; end program
+;;jz finish
+    
+cmp ah,3bH                  ;; check chat
+jz Chat
+    
+cmp ah,3ch                  ;; check game                                        
+jz play
+
+jnz incorrect               
+
+chat:
+printnotification waitchatmes    
+incorrect2:
+mov ah,0h
+int 16h
+cmp ah,3bh
+jnz incorrect2    
+mov ax,0003h
+int 10h
+mov ah,9
+mov dx, offset chatmessage
+int 21h
+;;printline
+waitchat:
+mov ah,0h
+int 16h  
+cmp ah,3dh
+jnz waitchat
+jz again
+        
+play:
+printnotification waitplaymes
+incorrect1:
+mov ah,0h
+int 16h
+cmp ah,3ch
+jnz incorrect1
+jmp letsstart
+;;mov ax,0003h
+;;int 10h
+;;mov ah,9
+;;mov dx, offset gamemode
+;;int 21h    
+;;printline
+waitplay:
+mov ah,0h
+int 16h  
+cmp ah,3dh
+jnz waitplay
+jz again
+
+
+
+;;;;;;;;;;;;;;;;;
+letsstart:
+
 ; setting directory to read files 
 MOV AH, 3BH
 MOV DX, OFFSET DIRECTORY
@@ -322,12 +501,6 @@ SkipFirstTime:   CALL GAME
                           ; so to make it short is just get the origin color from [chosenSquareColor]  and push it to the stack , so that DrawSquare procedure use it and draw the origin color square again  
                            RevertFlickering
                           COMP:
-                          cmp ah, 0bh
-                          jz SWITCHBLACK
-                          cmp ah, 52h
-                          jz SWITCHBLACK
-                          cmp [sizeEntered], 0H
-                          jge BatchSwitch
                           cmp ah , 48h ; ascii for up
                           jz UP 
                           cmp ah , 50h ; ascii for down 
@@ -376,14 +549,6 @@ SkipFirstTime:   CALL GAME
             int 16h
             jmp SWITCHBLACK
 
-
-BatchSwitch:    cmp ah, 48h
-                jb EmptyBufferInBlack
-                cmp ah, 52h
-                ja SWITCHBLACK
-                EmptyBufferInBlack:     mov ax, 0h
-                                        int 16h
-
 SWITCHBLACK: MOV [WhichTurn], OFFSET chosenSquare ; Source
 MOV [WhichToExchange], OFFSET chosenSquareBlack ; Destination
 mov [WhichIsEnemy], OFFSET chosenSquareWhite    ; Copy My Move to Enemy to detect
@@ -422,12 +587,6 @@ mov [FirstTime], 0h
             handlearrowsWhite: ; is just checking if it is Currentcolor of the square is the same as flickering color ; Before moving i need to reset it to the original backgrnd color 
                           ; so to make it short is just get the origin color from [chosenSquareColor]  and push it to the stack , so that DrawSquare procedure use it and draw the origin color square again  
                            RevertFlickering
-                          cmp ah, 0bh
-                          jz SWITCHWHITE
-                          cmp ah, 52h
-                          jz SWITCHWHITE
-                          cmp [sizeEntered], 0H
-                          jge BatchSwitchWhite
                           cmp al , 77h ; ascii for up
                           jz WUP 
                           cmp al , 73h ; ascii for down 
@@ -476,13 +635,6 @@ mov [FirstTime], 0h
             mov [Currentcolor], dx
             mov ah, 0h
             int 16h
-
-BatchSwitchWhite:    cmp ah, 10h
-                jb EmptyBufferInWhite
-                cmp ah, 32h
-                ja SWITCHWHITE
-                EmptyBufferInWhite:     mov ax, 0h
-                                        int 16h
 
 SWITCHWHITE: MOV [WhichTurn], OFFSET chosenSquare ; Source
 MOV [WhichToExchange], OFFSET chosenSquareWhite ; Destination
@@ -1009,9 +1161,9 @@ RET
 CheckOpponent endp 
 
 GAME    PROC
-          CALL BatchModeFunc
-          cmp [sizeEntered], 0h
-          jge FINISHGAME
+          ;CALL BatchModeFunc
+          ;cmp [sizeEntered], 0h
+          ;jge FINISHGAME
           cmp [EnemySourceSquare], 0h
           jnz Chosen
           cmp [ColorCheck], 1h
@@ -1102,6 +1254,16 @@ GAME    PROC
         mov bl, [chessData+9D00h+bx]
         mov [sourceSquareColor], bx
         RevertFlickering
+
+        mov bh,0 
+        mov bl,[chosenSquare]
+        lea si, locked_squared
+        mov ah,2ch ; dh second ;
+        int 21h
+        mov al ,0h;
+        cmp  al,locked_squared[bx]
+        jnz Donotmove
+
         CALL RULES
         mov cl, [chosenSquareColor]
         mov ch, 0h
@@ -1150,7 +1312,24 @@ GAME    PROC
         WhiteEnemy: mov di, [numOfWhiteDead]
         mov [ArrayOfWhiteDead+di], al
         inc [numOfWhiteDead]
-        NOKILL: mov al, [destSquare]
+        NOKILL:         ;; where the execution of powerup will occur
+        mov al,[rand]
+        mov ah,[chosenSquare]
+        cmp al,ah
+        jz checktokin
+        jnz continue
+    
+        checktokin: 
+        cmp [freezingtime],1
+        JA executetokin
+        jz continue
+
+        executetokin: 
+        dec freezingtime
+        mov al,[freezingtime]
+        
+        continue:
+        mov al, [destSquare]
         inc al
         mov [EnemySourceSquare], al
         mov [ColorCheck], 1h
@@ -1161,6 +1340,42 @@ GAME    PROC
         mov Squares[bx] , 0h;
         mov bl ,[destSquare]
         mov Squares[bx] , cl ;   
+
+        ;;increment total number of moves and make a comparison with a constant number to draw the powerup after it
+        inc numberofmoves;
+        cmp [numberofmoves],05H        
+        jz power
+        jnz completeee
+
+        power:
+        pusha
+        mov cx,[rowX]
+        push cx
+        mov cx,[rowY]
+        push cx
+        PlacePowerup1    
+        mov numberofmoves,0
+        pop cx
+        mov [rowY],cx
+        pop cx
+        mov [rowX],cX
+        popa
+
+        ; we are going to use Extra segment to to write to screen directly withtout using interupt 
+                ;--------------------------timer call------------------------------------
+        completeee:
+        pusha
+        
+        mov bh,0
+        mov bl,[chosenSquare]
+        mov ah,2ch
+        int 21h; dh contain the time in seconds
+
+        mov locked_squared[bx],dh
+        mov[chosenSquareTimer], bl; 
+        popa
+        ;--------------------------------------------------------------
+
         ; we are going to use Extra segment to to write to screen directly withtout using interupt 
         mov ax, 0a000h ;  adress of graphics part in extra segment 
         mov es, ax ;
@@ -1250,7 +1465,136 @@ sub ax, 30h
 mov [rowY], ax
 mov [sourceSquare], 0ffh
 mov [destSquare], 0ffh
-FINISHGAME: RET
+
+FINISHGAME: 
+    mov bx , 0h ;
+    mov ax , [rowX]; 
+    mov cx , [rowY]; 
+    mov dl , [chosenSquare];
+    mov dh, [chosenSquareColor] ; 
+    push ax; 
+    push cx ;  
+    push dx ; 
+
+    LoopLockedSquared:    
+
+
+        pushA 
+        mov [chosenSquare] , bl; 
+        push bx ; 
+        call SquaresCalculation; 
+        add sp ,2h;
+        call GetSquareColor;  
+
+
+        cmp locked_squared[bx], 0h ;
+        jz  FinishTimer 
+
+        mov ah , 2ch ; 
+        int 21h ; 
+        cmp [freezingtime],1H
+        jB comp3
+        mov cl , locked_squared[bx] ; 
+        sub dh , cl ;
+        cmp dh , 1h ; 
+        jb FinishTimer
+        cmp [TimerFlag] , 1h; 
+        jB comp4
+        cmp [freezingtime],1H
+        jz comp3
+        jmp comp1
+
+
+
+        comp4:
+        mov [TimerFlag] , 1h ; 
+
+        pushA
+        mov si , offset one ;
+        push si ;
+        call DrawNumbers; 
+        pop si 
+        popA ; 
+
+        jmp FinishTimer
+        comp1:
+
+        mov ah , 2ch ; 
+        int 21h ; 
+        cmp [freezingtime],2H
+        jb comp3
+        mov cl , locked_squared[bx] ; 
+        sub dh , cl ; 
+        cmp dh , 2h ; 
+        jb FinishTimer
+        cmp [TimerFlag] , 2h; 
+        jb comp5
+        cmp [freezingtime],2H
+        jz comp3
+        jmp comp2
+
+
+        comp5:
+        mov [TimerFlag] , 2h ; 
+
+
+        pushA 
+        call DeleteNumber;
+        mov si , offset two ; 
+        push si
+        call DrawNumbers; 
+        pop si
+        popA 
+
+        jmp FinishTimer
+        comp2:
+        mov ah , 2ch ; 
+        int 21h ; 
+        cmp [freezingtime],3H
+        jb comp3
+        mov cl , locked_squared[bx] ; 
+        sub dh , cl ; 
+        cmp dh , 3h ; 
+        jb FinishTimer
+        cmp [TimerFlag] , 3h; 
+        jB comp6
+        cmp [freezingtime],3H
+        jz comp3
+        jmp comp3
+
+
+        comp6:
+        mov [TimerFlag] , 3h ;
+
+        pushA 
+        call DeleteNumber;
+        mov si , offset three ; 
+        push si 
+        call DrawNumbers; 
+        pop si 
+        popA 
+
+        jmp FinishTimer
+        comp3:
+        mov locked_squared[bx], 0h;
+        call DeleteNumber; 
+        mov [TimerFlag],0h ;
+        FinishTimer: 
+        popA
+        inc bx ; 
+        cmp bx , 64d ;
+        jnz LoopLockedSquared
+        
+        pop dx ;
+        pop cx ; 
+        pop ax;         
+         mov [chosenSquare] , dl ;
+         mov [chosenSquareColor], dh; 
+        mov [rowX] , ax ;
+        mov [rowY], cx; 
+
+        Donotmove:;
+RET
 GAME    ENDP
 
 SwitchTurns     PROC
@@ -1258,7 +1602,7 @@ SwitchTurns     PROC
 mov di, [WhichTurn]
 mov bx, [WhichToExchange]
 mov cx, bx
-add cx, 20h
+add cx, 21h
 
 TurnsLoopByte:  mov al, BYTE PTR[di]
                 mov BYTE PTR [bx], al
@@ -1269,7 +1613,7 @@ TurnsLoopByte:  mov al, BYTE PTR[di]
 
 mov al, [di]
 mov si, [WhichIsEnemy]
-add si, 1ah
+add si, 21h
 mov [si], al
 inc di
 inc bx
@@ -1746,21 +2090,21 @@ HandleBatchExecution    PROC
     jmp goback
 
 
-forcedkill:
-   Incorrect:
+forcedkill:     mov di, 0h
+   Incorrect1111:
     call random
 
     CONTRAND:   mov bl, [rand]
     mov bh,0h     
 
     cmp Squares[bx], 0h
-    jz Incorrect
+    jz Incorrect1111
 
     mov cl, Squares[bx]
     dec cl
     shr cl, 4h
     XOR cl, [isItWhite]
-    jz Incorrect
+    jz Incorrect1111
     
 
     cmp Squares[bx], 1h
@@ -1772,11 +2116,11 @@ forcedkill:
 
     NOKINGWhite:          cmp [numOfWhiteDead], 1fh
                           jz forcedkill2
-                          jmp Incorrect
+                          jmp Incorrect1111
 
     NOKINGBlack:          cmp [numOfBlackDead], 1fh
                           jz forcedkill2
-                          jmp Incorrect
+                          jmp Incorrect1111
 
 
 
@@ -1788,17 +2132,90 @@ goback:
 RET
 HandleBatchExecution    ENDP
 
-random proc    
-   cmp [xo], 0h
-   jnz CON     
-   mov al, [a]
-   mov [xo], al
-   CON: mov al, [xo]
+LoadSquareDate proc 
+pushA
+
+mov bl , [chosenSquare]; 
+mov bh  , 0h ; 
+mov cl, Squares[bx] ; accessing number of the piece in the file from Square Variable
+cmp cl, 0H ; compare to zero because if cl is zero then no piece will be drawn 
+jz LeaveSquare
+mov al, 08h ; mov al 8 , because as said before each has 8 bytes , so i need reach the begining of the file name in the [Pieces] variable  
+mul cl ; 8 * cl to know exaclty how many bytes I should move 
+mov si, offset Pieces  
+add si, ax ; si know points the the head name 
+mov byte ptr [si + 7], 0h ; adding zero at the end of the file name to be able to read the name by the interrupt 
+;;;MOV DX, OFFSET firstState
+MOV CX, 271H  ; 25d * 25d --> total number of pixel in each square 
+MOV DI, OFFSET chessData ; will be using this to load the pixel colors from the .bin file to it; 
+PUSH SI ; file name 
+PUSH CX ; number of bytes 
+PUSH DI ; place to write to the data in the memory 
+CALL HandleFile ; explained below 
+ADD SP, 6H ; free stack 
+mov byte ptr [si + 7], 20h ; m4 faker yasta kona 3amleeeno leeh XD , bs seebo talma 46al 
+
+popA
+LeaveSquare:
+RET
+LoadSquareDate ENDP 
+
+DrawNumbers proc ; Make SI filehandle
+ ;lea si, [filename]
+   
+    mov bp , sp ;  
+    mov si ,[bp+2];
+    mov cx,271H
+    mov di,offset chessData;
+    push si
+    push cx
+    push di
+    call HandleFile
+    add sp, 6H
+    
+    MOV dx,[rowX]
+    PUSH dx
+    mov dx,[rowY]
+    push dx
+    call DrawPiece
+    add sp ,4h; 
+
+    RET
+DrawNumbers endp
+
+DeleteNumber proc 
+     
+ mov bx, 04h
+    mov al, [chosenSquareColor]
+    mov ah, 0ch
+    push bx 
+    push ax
+    CALL DrawSquare
+    add sp, 4h
+    mov al, [chosenSquareColor]
+    mov ah,0
+    ;mov [Currentcolor], ax
+    
+
+    call LoadSquareDate; 
+
+    MOV dx,[rowX]
+    PUSH dx
+    mov dx,[rowY]
+    push dx
+    call DrawPiece
+    add sp ,4h; 
+    
+RET 
+DeleteNumber endp 
+
+random proc 
+   mov al,xo
    mul a
-   add al, [b]
+   add ax,b
    div [m]
    mov [rand],ah
-   mov [xo],ah
+   mov xo,ah
 RET;
 random ENDP
 
