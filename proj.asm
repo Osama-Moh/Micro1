@@ -160,10 +160,8 @@ message1        db       'To Start Chatting Press F1','$'
 message2        db       'To Start the game Press F2','$'
 message3        db       'To End The Program Press ESC','$'
 chatmessage     db       'Chat mode','$'
-gamemode        db       'Gamemode','$'
 waitchatmes     db       'There is a chat invitation. If you want to accept it click f1','$'
 waitplaymes     db       'There is a game invitation. If you want to accept it click f2','$'   
-dashes          db       '-','$'
 ;;end             db       'The Program has been ended','$'
 
 chessData db  9C40h dup(?); all pixels in the grid in the start 
