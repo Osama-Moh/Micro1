@@ -322,6 +322,12 @@ SkipFirstTime:   CALL GAME
                           ; so to make it short is just get the origin color from [chosenSquareColor]  and push it to the stack , so that DrawSquare procedure use it and draw the origin color square again  
                            RevertFlickering
                           COMP:
+                          cmp ah, 0bh
+                          jz SWITCHBLACK
+                          cmp ah, 52h
+                          jz SWITCHBLACK
+                          cmp [sizeEntered], 0H
+                          jge BatchSwitch
                           cmp ah , 48h ; ascii for up
                           jz UP 
                           cmp ah , 50h ; ascii for down 
@@ -368,6 +374,15 @@ SkipFirstTime:   CALL GAME
             mov [Currentcolor], dx
             mov ah,0h  ; empty the buffer if the key is pressed 
             int 16h
+            jmp SWITCHBLACK
+
+
+BatchSwitch:    cmp ah, 48h
+                jb EmptyBufferInBlack
+                cmp ah, 52h
+                ja SWITCHBLACK
+                EmptyBufferInBlack:     mov ax, 0h
+                                        int 16h
 
 SWITCHBLACK: MOV [WhichTurn], OFFSET chosenSquare ; Source
 MOV [WhichToExchange], OFFSET chosenSquareBlack ; Destination
@@ -407,6 +422,12 @@ mov [FirstTime], 0h
             handlearrowsWhite: ; is just checking if it is Currentcolor of the square is the same as flickering color ; Before moving i need to reset it to the original backgrnd color 
                           ; so to make it short is just get the origin color from [chosenSquareColor]  and push it to the stack , so that DrawSquare procedure use it and draw the origin color square again  
                            RevertFlickering
+                          cmp ah, 0bh
+                          jz SWITCHWHITE
+                          cmp ah, 52h
+                          jz SWITCHWHITE
+                          cmp [sizeEntered], 0H
+                          jge BatchSwitchWhite
                           cmp al , 77h ; ascii for up
                           jz WUP 
                           cmp al , 73h ; ascii for down 
@@ -455,6 +476,13 @@ mov [FirstTime], 0h
             mov [Currentcolor], dx
             mov ah, 0h
             int 16h
+
+BatchSwitchWhite:    cmp ah, 10h
+                jb EmptyBufferInWhite
+                cmp ah, 32h
+                ja SWITCHWHITE
+                EmptyBufferInWhite:     mov ax, 0h
+                                        int 16h
 
 SWITCHWHITE: MOV [WhichTurn], OFFSET chosenSquare ; Source
 MOV [WhichToExchange], OFFSET chosenSquareWhite ; Destination
@@ -981,7 +1009,9 @@ RET
 CheckOpponent endp 
 
 GAME    PROC
-    
+          CALL BatchModeFunc
+          cmp [sizeEntered], 0h
+          jge FINISHGAME
           cmp [EnemySourceSquare], 0h
           jnz Chosen
           cmp [ColorCheck], 1h
@@ -1542,9 +1572,11 @@ BatchModeFunc      PROC
     jnz FirstTimeBatch
     jmp NoBatch
 
-    CheckAbove: cmp ah, 10h
+    CheckAbove: cmp al, 0dh
+                jz NoBatch
+    cmp ah, 10h
     jb EmptyBuffer
-    cmp al, 32h
+    cmp ah, 32h
     jbe NoBatch
     cmp ah, 48h
     jb EmptyBuffer
@@ -1565,13 +1597,14 @@ BatchModeFunc      PROC
     
     ;;start of batch mode
 
-    FirstTimeBatch: inc [sizeEntered]    
-                    mov ah, 0H   ;; Empty Buffer
-                    int 16h
-    
-    batchmode: mov ah, 1h       ;;take char 
+    FirstTimeBatch: mov ax, 0H   ;; Empty Buffer
+                    int 16h 
+                    inc [sizeEntered]    
+                    
+    push ax
+    batchmode: mov ah, 0h       ;;take char 
     int 16h                              
-    jz NoBatch
+    ;jz NoBatch
     cmp al, 30H     ;;sompare if zero
     jz ResetBatch        ;;end batch mode
 
@@ -1580,14 +1613,15 @@ BatchModeFunc      PROC
     mov al, 0h
     jmp XORING2
     Black2:  cmp ah, 52h
-            ja CheckAbove    
+            ja CheckAbove
             mov al, 1h
 
     XORING2: xor [isItWhite], al
     jz NoBatch
+    pop ax
 
-    mov ah, 0h
-    int 16h
+    ;mov ah, 0h
+    ;int 16h
 
     mov ah, 2
     mov dx, 17F0h
@@ -1686,6 +1720,8 @@ HandleBatchExecution    PROC
     TryBlack:   cmp squares[bx], 11H
                 JAE forcedkill
 
+    mov [sizeEntered], 0feh
+
     mov cl, [chessData+9D00h+bx]
     mov [chosenSquareColor], cl
     mov ch, 0h
@@ -1693,7 +1729,7 @@ HandleBatchExecution    PROC
     mov [chosenSquare], bl
     push ax
     CALL SquaresCalculation
-    CALL Game
+    CALL GAME
 
     pop bx
     mov cl, [chessData+9D00h+bx]
@@ -1704,6 +1740,8 @@ HandleBatchExecution    PROC
     push ax
     CALL SquaresCalculation
     CALL Game
+
+    inc [sizeEntered]
 
     jmp goback
 
