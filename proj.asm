@@ -115,6 +115,7 @@ rand    db      ?
 numberofmoves       db          ?
 freezingtime        db      3h
 
+exitCondition       db      0h
 
 message1        db       'To Start Chatting Press F1','$'
 message2        db       'To Start the game Press F2','$'
@@ -131,7 +132,7 @@ WhiteKingCheckMate db 0h ;
 KingTobeChecked    db 0h ; 
 BlackWhiteFlag     db 1h ; 
 KnightCheckMate   db  ? ; 
-CHECKmsg          db  'Check' , '$';  
+CHECKmsg          db  'CheckMate' , '$';  
 ;--------------------------timer------------------------------------
 time_left dB 64 dup(0)
 ready_to_move dB  64 dup(1)
@@ -356,7 +357,7 @@ main PROC far
 mov ax , @data ;
 mov ds , ax ;
 
-mov ax,0003h                ;; clear the screen
+ClearScreem:    mov ax,0003h                ;; clear the screen
 int 10h    
         
 again:
@@ -370,8 +371,8 @@ int 16h
 push ax
 pop ax
     
-;;cmp ah,01h                  ;; end program
-;;jz finish
+cmp ah, 01h                  ;; end program
+jz finish
     
 cmp ah,3bH                  ;; check chat
 jz Chat
@@ -417,9 +418,7 @@ jmp letsstart
 ;;printline
 waitplay:
 mov ah,0h
-int 16h  
-cmp ah,3dh
-jnz waitplay
+int 16h
 jz again
 
 
@@ -501,6 +500,8 @@ SkipFirstTime:   CALL GAME
                           ; so to make it short is just get the origin color from [chosenSquareColor]  and push it to the stack , so that DrawSquare procedure use it and draw the origin color square again  
                            RevertFlickering
                           COMP:
+                          cmp ah, 3dh
+                          jz ClearScreem
                           cmp ah , 48h ; ascii for up
                           jz UP 
                           cmp ah , 50h ; ascii for down 
@@ -586,7 +587,9 @@ mov [FirstTime], 0h
                     jz SWITCHWHITE
             handlearrowsWhite: ; is just checking if it is Currentcolor of the square is the same as flickering color ; Before moving i need to reset it to the original backgrnd color 
                           ; so to make it short is just get the origin color from [chosenSquareColor]  and push it to the stack , so that DrawSquare procedure use it and draw the origin color square again  
-                           RevertFlickering
+                          RevertFlickering
+                          cmp ah, 3dh
+                          jz ClearScreem
                           cmp al , 77h ; ascii for up
                           jz WUP 
                           cmp al , 73h ; ascii for down 
@@ -646,11 +649,10 @@ JMP GAMELBLBlack
 ;mov al , 3h ;
 ;int 10h ;
 ; call interrup to terminate the program the return to OS 
-mov ah , 4ch ;
+finish:  mov ah , 4ch ;
 int 21h;
 
 
-hlt
 main ENDP
 
 ; In order for this procedure to work you have to put in DX the OFFSET of your file name variable
@@ -1278,7 +1280,11 @@ GAME    PROC
         mov [EnemySourceSquare], al
         cmp [chosenSquareColor], 35h
         jz GoToDest
-        mov bl, [chosenSquare]
+        ;mov al, [chosenSquare]
+        ;cmp al, [rand]
+        ;jnz ContComparison
+        ;mov 
+        ContComparison: mov bl, [chosenSquare]
         mov bh, 0h
         cmp [Squares+bx], 0h
         jz IMPDES
@@ -1496,10 +1502,10 @@ FINISHGAME:
         jB comp3
         mov cl , locked_squared[bx] ; 
         sub dh , cl ;
-        cmp dh , 1h ; 
-        jb FinishTimer
         cmp [TimerFlag] , 1h; 
         jB comp4
+        cmp dh , 1h ; 
+        jb FinishTimer
         cmp [freezingtime],1H
         jz comp3
         jmp comp1
@@ -1525,10 +1531,10 @@ FINISHGAME:
         jb comp3
         mov cl , locked_squared[bx] ; 
         sub dh , cl ; 
-        cmp dh , 2h ; 
-        jb FinishTimer
         cmp [TimerFlag] , 2h; 
         jb comp5
+        cmp dh , 2h ; 
+        jb FinishTimer
         cmp [freezingtime],2H
         jz comp3
         jmp comp2
@@ -1554,12 +1560,10 @@ FINISHGAME:
         jb comp3
         mov cl , locked_squared[bx] ; 
         sub dh , cl ; 
-        cmp dh , 3h ; 
-        jb FinishTimer
         cmp [TimerFlag] , 3h; 
         jB comp6
-        cmp [freezingtime],3H
-        jz comp3
+        cmp dh , 2h ; 
+        jb FinishTimer
         jmp comp3
 
 
