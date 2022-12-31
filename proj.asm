@@ -22,8 +22,7 @@ rowX            DW      ? ; coordinates SrcSquare
 rowY            DW      ?
 Flicker         dw      08h
 ColorCheck      dw      2h
-
-
+ 
 chosenSquareWhite    db     3H ; 
 TimerFlagWhite db    0h;
 chosenSquareColorWhite   DB  ? ; 
@@ -1273,6 +1272,7 @@ GAME    PROC
         jmp FINISHGAME
 
         Dest:   
+        
         ; CALL RULES -------------------------------------------
         mov [DESELECT], 1H
         mov al, 1h
@@ -1428,7 +1428,7 @@ GAME    PROC
                         mov dx, [rowX]
                         mov ah, 0dh
                         int 10h
-
+                       
                         cmp ax, si; if the pixel contain the same color of the background No copy will occure 
                         jz NOCOPY
                         STOSB ; store  es:di [location if the pixel of destination Square in extra segement] = AL [color of the pixel ]
