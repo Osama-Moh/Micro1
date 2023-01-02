@@ -2,6 +2,10 @@
 .model small
 .stack 64
 .data
+
+Esource         db      ?
+Edest           db      ?
+
 chosenSquare    db     3BH ; To Whom is moving variables. Please note to move these variables togetherrrrrrrrrrrrrrrrr.
 TimerFlag db    0h; 
 chosenSquareColor   DB  ? ; 
@@ -22,27 +26,6 @@ rowX            DW      ? ; coordinates SrcSquare
 rowY            DW      ?
 Flicker         dw      08h
 ColorCheck      dw      2h
- 
-chosenSquareWhite    db     3H ; 
-TimerFlagWhite db    0h;
-chosenSquareColorWhite   DB  ? ; 
-numOfDirectionsWhite         db      0h ; Procedure Rules sets those variables according to the piece
-ArrayOfDirectionsWhite       db      8 dup(0h), 0h ; Permissible moves for a piece
-ArrayOfRepetitionsWhite      db      8 dup(0h), 0h ;
-sourceSquareWhite    db      0FFH ; square to be moved 
-destSquareWhite      db      0FFH ; destination after movment 
-FlickeringTimeWhite  db      1h
-SelectionKeyWhite         db      71h
-SELECTEDWhite        db      0h
-enteredWhite        db      5 dup(0ffh)
-sizeEnteredWhite           db      0ffh
-EnemySourceSquareWhite   db  0h
-CurrentcolorWhite    DW      06h 
-sourceSquareColorWhite   dw      ?
-rowXWhite            DW      ? ; coordinates SrcSquare 
-rowYWhite            DW      ?
-FlickerWhite         dw      31h
-ColorCheckWhite      dw      2h
 
 chosenSquareBlack    db     3bH ; 
 TimerFlagBlack db    0h; 
@@ -123,6 +106,7 @@ chatmessage     db       'Chat mode','$'
 waitchatmes     db       'There is a chat invitation. If you want to accept it click f1','$'
 waitplaymes     db       'There is a game invitation. If you want to accept it click f2','$'   
 endmessage             db       'The Program has been ended','$'
+indicator        DB         0
 
 KingW          db 0h  
 KingB          db 0h 
@@ -141,6 +125,12 @@ ChosenSquareTimer db 0 ;
 one    db 'one.bin', 0H
 two    dB   'two.bin', 0H
 three    dB   'three.bin', 0H
+
+value db ?, "$"
+cursorWrite  dw 0h
+cursorRead   dw 29h
+valueNotSent  db    0h, '$'
+
 imagedata db 625 dup(?);
 
 chessData db  9C40h dup(?); all pixels in the grid in the start 
@@ -225,6 +215,22 @@ PlacePowerup1    Macro   ;;this macro will be executed when the number of correc
     Call DrawPiece
     pop dx
     pop dx
+ENDM
+
+printline MACRO
+    local middle
+    pusha 
+    mov ah,2                    ;; print the line of the notify bar
+    mov dl,0d
+    mov dh,22d
+    int 10h   
+    mov cx,80    
+    middle:         
+    mov ah,2 
+    mov dl,'-'
+    int 21h
+    loop middle
+    popa
 ENDM
 
 RevertFlickering    MACRO
@@ -356,13 +362,33 @@ main PROC far
 mov ax , @data ;
 mov ds , ax ;
 
+; initinalize COM
+    ;Set Divisor Latch Access Bit
+    mov dx,3fbh 			; Line Control Register
+    mov al,10000000b		;Set Divisor Latch Access Bit
+    out dx,al				;Out it
+    ;Set LSB byte of the Baud Rate Divisor Latch register.
+    mov dx,3f8h			
+    mov al,0ch			
+    out dx,al
+
+    ;Set MSB byte of the Baud Rate Divisor Latch register.
+    mov dx,3f9h
+    mov al,00h
+    out dx,al
+
+    ;Set port configuration
+    mov dx,3fbh
+    mov al,00011011b
+    out dx,al
+
 ClearScreem:    mov ax,0003h                ;; clear the screen
 int 10h    
         
 again:
     
 showmain message1,message2,message3
-;;printline    
+printline    
     
 incorrect:
 mov ah,0h    
@@ -381,44 +407,180 @@ jz play
 
 jnz incorrect               
 
-chat:
+Chat:
 printnotification waitchatmes    
-incorrect2:
 mov ah,0h
 int 16h
 cmp ah,3bh
-jnz incorrect2    
+jnz again    
 mov ax,0003h
 int 10h
 mov ah,9
 mov dx, offset chatmessage
 int 21h
-;;printline
+printline
 waitchat:
-mov ah,0h
-int 16h  
-cmp ah,3dh
-jnz waitchat
+mov ax,0600h
+mov bh,07
+mov cx,0
+mov dx,184FH
+int 10h
+
+mov dx, 27h
+DrawSeparation: mov ah,2
+mov bh, 0h
+int 10h 
+
+mov ah,9 ;Display
+mov bh,0h ;Page 0
+mov al,'|' ;Letter |
+mov cx,2h ;5 times
+mov bl, 0fh ;Green (A) on white(F) background
+int 10h
+
+add dx, 100h
+cmp dx, 1927h
+jnz DrawSeparation
+
+mov dx, 0h
+mov ah, 2h
+mov bh, 0h
+int 10h 
+
+
+CHECK: mov ah,1h
+int 16h
+jz ReadSerial
+mov ah, 0h
+int 16h
+
+mov [value], al
+
+cmp ah, 3dh
+jz SendEnd
+
+
+mov ah,2
+mov bh, 0h
+mov dx, [cursorWrite]
+int 10h
+
+mov ah,2
+mov dl, [value]
+int 21h
+
+cmp dl, 0dh ; Check Enter Case
+jnz ADD2
+add [cursorWrite], 100h
+mov BYTE PTR [cursorWrite], 0h
+jmp SCROLL2
+ADD2:   add [cursorWrite], 1h
+
+SCROLL2:    cmp BYTE PTR [cursorWrite], 27h
+            JNZ CheckSC2
+            add [cursorWrite], 100h
+            mov BYTE PTR [cursorWrite], 0h
+            CheckSC2:   cmp [cursorWrite], 1900h
+            jnz WriteToUART
+
+               impsc2: mov ah,6       ; function 6
+               mov al,1        ; scroll by 1 line    
+               mov bh,7       ; normal video attribute         
+               mov ch,0       ; upper left Y
+               mov cl,0h        ; upper left X
+               mov dh,18h     ; lower right Y
+               mov dl,26h      ; lower right X 
+               int 10h
+               sub [cursorWrite], 100h
+
+;Check that Transmitter Holding Register is Empty
+            WriteToUART:    mov dx , 3FDH		; Line Status Register
+
+            In al , dx 			;Read Line Status
+            AND al , 00100000b
+            jnz SEND
+            mov al, [value]
+            mov [valueNotSent], al
+            jmp ReadSerial
+
+    ;If empty put the VALUE in Transmit data register
+            SEND:   mov dx , 3F8H		; Transmit data register
+            mov al, [value]
+            out dx ,  al 
+            jmp ReadSerial
+
+            SendEnd:    mov dx, 3f8h
+            mov al, 3dh
+            out dx, al
+            jmp exitChat
+
+            SENDNOTSENT:    mov dx , 3F8H		; Transmit data register
+            mov al, [valueNotSent]
+            out dx ,  al 
+            mov [valueNotSent], 0h
+            jmp CHECK
+
+ReadSerial:     mov dx , 3FDH		; Line Status Register
+            	in al , dx 
+                AND al , 1
+                JZ CHECK
+
+                mov dx , 03F8H
+                in al , dx 
+                mov [value] , al
+
+                cmp al, 3dh
+                jz exitChat
+
+                mov ah,2
+                mov bh, 0h
+                mov dx, [cursorRead]
+                int 10h
+
+
+                mov ah,2
+                mov dl, [value]
+                int 21h
+                
+                cmp dl, 0dh ; Check Enter Case
+                jnz ADD1
+                add [cursorRead], 100h
+                mov BYTE PTR [cursorRead], 29h
+                jmp SCROLL
+                ADD1:   add [cursorRead], 1h
+               SCROLL:  cmp BYTE PTR [cursorRead], 4fh
+                        JNZ CheckSC
+                        add [cursorRead], 100h
+                        mov BYTE PTR [cursorRead], 29h
+                        jmp impsc
+                        CheckSC:    cmp [cursorRead], 1929h
+                        jnz checkNotSent
+
+               impsc: mov ah,6       ; function 6
+               mov al,1        ; scroll by 1 line    
+               mov bh,7       ; normal video attribute         
+               mov ch,0       ; upper left Y
+               mov cl,29h        ; upper left X
+               mov dh,18h     ; lower right Y
+               mov dl,79      ; lower right X 
+               int 10h
+               sub [cursorRead], 100h
+
+                checkNotSent: cmp [valueNotSent], 0h
+                jnz SENDNOTSENT
+                jmp CHECK           
+
+
+exitChat: 
 jz again
         
 play:
 printnotification waitplaymes
-incorrect1:
 mov ah,0h
 int 16h
 cmp ah,3ch
-jnz incorrect1
+jnz again
 jmp letsstart
-;;mov ax,0003h
-;;int 10h
-;;mov ah,9
-;;mov dx, offset gamemode
-;;int 21h    
-;;printline
-waitplay:
-mov ah,0h
-int 16h
-jz again
 
 
 
@@ -484,12 +646,10 @@ mov [Currentcolor], dx
 jmp SkipFirstTime
 
 GAMELBLBlack:
-MOV [WhichTurn], OFFSET chosenSquareBlack ; Source
-MOV [WhichToExchange], OFFSET chosenSquare ; Destination
-mov [WhichIsEnemy], OFFSET chosenSquare    ; Enemy Data Copied to At this time's data
-CALL SwitchTurns
 mov [isItWhite], 0h
-SkipFirstTime:   CALL GAME
+SkipFirstTime: 
+CALL GAME
+CALL RecieveData
 
 ;;;;;;;;;;;;;;;;;;;;;; arrows Movement , this part is responsible for moving the flickering square in the gird 
                     Arrows:  mov ah,01h; 
@@ -509,10 +669,6 @@ SkipFirstTime:   CALL GAME
                           jz RIGHT 
                           cmp ah , 4Bh;  ascii for left 
                           jz LEFT;
-                          cmp al, 61h
-                          jb MoveSquareBlack
-                          cmp al, 7ah
-                          jb SWITCHBLACK
                         exit:
                           jmp MoveSquareBlack;   
             ; in this part , i just move rowX and rowY variables according to the key pressed , also i make sure that the flickering color is not getting out of the grid 
@@ -549,100 +705,7 @@ SkipFirstTime:   CALL GAME
             int 16h
             jmp SWITCHBLACK
 
-SWITCHBLACK: MOV [WhichTurn], OFFSET chosenSquare ; Source
-MOV [WhichToExchange], OFFSET chosenSquareBlack ; Destination
-mov [WhichIsEnemy], OFFSET chosenSquareWhite    ; Copy My Move to Enemy to detect
-CALL SwitchTurns
-
-MOV [WhichTurn], OFFSET chosenSquareWhite ; Source
-MOV [WhichToExchange], OFFSET chosenSquare ; Destination
-mov [WhichIsEnemy], OFFSET chosenSquare    ; Enemy Data Copied to At this time's data
-CALL SwitchTurns
-mov [isItWhite], 1h
-
-cmp [FirstTime], 1h
-jnz FIRSTWHITETIME
-; First Time
-mov cl, [chosenSquare] ; it place where the flickers begins ; black king ;
-mov ch, 0h
-PUSH CX
-CALL SquaresCalculation
-add sp, 2h
-
-CALL GetSquareColor ; get color in current rowx and rowy 
-mov dl, [chosenSquareColor] ; color in the dx ; 
-mov dh, 0h
-mov [Currentcolor], dx
-
-
-; End Of First Time
-FIRSTWHITETIME: CALL GAME
-mov [FirstTime], 0h
-
-
-;;;;;;;;;;;;;;;;;;;;;; arrows Movement , this part is responsible for moving the flickering square in the gird 
-                    mov ah,01h; 
-                    int 16h; check if any key is pressed 
-                    jz SWITCHWHITE
-            handlearrowsWhite: ; is just checking if it is Currentcolor of the square is the same as flickering color ; Before moving i need to reset it to the original backgrnd color 
-                          ; so to make it short is just get the origin color from [chosenSquareColor]  and push it to the stack , so that DrawSquare procedure use it and draw the origin color square again  
-                          RevertFlickering
-                          cmp ah, 3dh
-                          jz ClearScreem
-                          cmp al , 77h ; ascii for up
-                          jz WUP 
-                          cmp al , 73h ; ascii for down 
-                          jz WDOWN 
-                          cmp al , 64h ;  ascii for right 
-                          jz WRIGHT 
-                          cmp al , 61h;  ascii for left 
-                          jz WLEFT;
-                          cmp al, 0dh
-                          jz SWITCHWHITE
-                          cmp ah, 48h
-                          jb MoveSquareWhite
-                          cmp ah, 50h
-                          jb SWITCHWHITE
-                        Wexit:
-                          jmp MoveSquareWhite;   
-            ; in this part , i just move rowX and rowY variables according to the key pressed , also i make sure that the flickering color is not getting out of the grid 
-            ; also i change the  chosenSquare number becuause it will be used again ;  
-            WUP:
-            cmp [rowX], 1h ; check if it is out of the grid
-            jz Wexit ; 
-            sub [rowX],19h; 25 pixel up 
-            sub [chosenSquare], 8h ; the number decrease by 8h; 
-            jmp MoveSquareWhite;
-            WDOWN:
-            cmp [rowX] , 0B0h;
-            jz Wexit 
-            add [rowX],19h;
-            add [chosenSquare], 8h; the number of square increase by 8h;  
-            jmp MoveSquareWhite;
-            WLEFT :
-            cmp [rowY] ,00h ; 
-            jz Wexit ;
-            sub [rowY],19h;
-            sub [chosenSquare], 1h ;the number of square decrement by 1h;  
-            jmp MoveSquareWhite;
-            WRIGHT:
-            cmp[rowY] ,  0AFh; 
-            jz Wexit
-            add [rowY],19h;
-            add [chosenSquare], 1h ;  the number of square increase by 1h;  
-            MoveSquareWhite:         ; this will the program main Loop    
-            CALL GetSquareColor ; get color in current rowx and rowy 
-            mov dl, [chosenSquareColor] ; color in the dx ; 
-            mov dh, 0h
-            mov [Currentcolor], dx
-            mov ah, 0h
-            int 16h
-
-SWITCHWHITE: MOV [WhichTurn], OFFSET chosenSquare ; Source
-MOV [WhichToExchange], OFFSET chosenSquareWhite ; Destination
-mov [WhichIsEnemy], OFFSET chosenSquareBlack    ; Copy My Move to the enemy to update
-CALL SwitchTurns
-JMP GAMELBLBlack
+SWITCHBLACK:    jmp GAMELBLBlack
 
 ;mov ah , 0h ;
 ;mov al , 3h ;
@@ -1165,6 +1228,8 @@ GAME    PROC
           ;CALL BatchModeFunc
           ;cmp [sizeEntered], 0h
           ;jge FINISHGAME
+          cmp [Enemy], 1h
+          jz EnmeyTurn
           cmp [EnemySourceSquare], 0h
           jnz Chosen
           cmp [ColorCheck], 1h
@@ -1241,8 +1306,6 @@ GAME    PROC
         ;jz FINISHGAME
         cmp [sourceSquare], 0ffh ; if sourceSquare is 0ffh then it is not defined  yet  
         jnz Dest
-        mov [EnemySourceSquare], bl
-        inc [EnemySourceSquare]
         MOV AL, [Squares+bx]
         dec al
         mov ah, 0h
@@ -1252,6 +1315,8 @@ GAME    PROC
         ChangeSelected: mov bl, [chosenSquare] ; chosend Square will be changed every arrow move (also it appears below ) 
         mov [sourceSquare], bl ; make sourceSquare equal to chosenSquare ,so when enter is pressed sourceSquare will be the chosenSquare 
         mov bh, 0h
+        mov [EnemySourceSquare], bl
+        inc [EnemySourceSquare]
         mov bl, [chessData+9D00h+bx]
         mov [sourceSquareColor], bx
         RevertFlickering
@@ -1279,6 +1344,8 @@ GAME    PROC
         add al, [sourceSquare]
         mov [EnemySourceSquare], al
         cmp [chosenSquareColor], 35h
+        jz GoToDest
+        cmp [chosenSquareColor],00h
         jz GoToDest
         ;mov al, [chosenSquare]
         ;cmp al, [rand]
@@ -1338,7 +1405,8 @@ GAME    PROC
         mov al, [destSquare]
         inc al
         mov [EnemySourceSquare], al
-        mov [ColorCheck], 1h
+        add [EnemySourceSquare], 40h
+        EnmeyTurn:  mov [ColorCheck], 1h
         mov ch , 0h ;
         mov bh , 0h ;
         mov bl , [sourceSquare] ;
@@ -1369,7 +1437,8 @@ GAME    PROC
 
         ; we are going to use Extra segment to to write to screen directly withtout using interupt 
                 ;--------------------------timer call------------------------------------
-        completeee:
+        completeee:     cmp [Enemy], 1h
+        jz DrawMove
         pusha
         
         mov bh,0
@@ -1383,7 +1452,7 @@ GAME    PROC
         ;--------------------------------------------------------------
 
         ; we are going to use Extra segment to to write to screen directly withtout using interupt 
-        mov ax, 0a000h ;  adress of graphics part in extra segment 
+        DrawMove:   mov ax, 0a000h ;  adress of graphics part in extra segment 
         mov es, ax ;
         mov ax, [rowX] ; 
         mov [destX], ax ; setting the destX to the X of the currently selected square 
@@ -2222,5 +2291,93 @@ random proc
    mov xo,ah
 RET;
 random ENDP
+
+RecieveData         PROC
+    mov al, [EnemySourceSquare]
+    mov dx , 3F8H		; Transmit data register
+    out dx ,  al
+
+    mov [EnemySourceSquare], 0h
+
+    CONTTTTT: cmp al, 0h
+    jz nostop
+
+    nostop: mov dx , 3FDH		; Line Status Register
+    In al , dx 			;Read Line Status
+    AND AL, 1h
+    jz NothingToDo
+
+    mov dx, 3f8h
+    in al, dx
+
+    cmp al, 40h
+    jbe SaveBeforeDoingNothing
+    sub al, 41h
+    mov [EnemySourceSquare], al
+    
+    mov [WhichTurn], OFFSET chosenSquare ; Source
+    mov [WhichToExchange], OFFSET chosenSquareBlack ; Destination
+    mov [WhichIsEnemy], OFFSET chosenSquareBlack    ; Copy My Move to Enemy to detect
+    CALL SwitchTurns
+   
+    mov al, [Esource]
+    mov [chosenSquare], al
+    mov [sourceSquare], al ; Done
+    mov [Enemy], 1h ; Remember to move 0 to it .................................................
+    mov ah, 0h
+    push ax
+    CALL SquaresCalculation
+    add sp, 2h
+    CALL GetSquareColor
+    
+    mov al, [chosenSquareColor]
+    mov ah, 0h
+    mov [sourceSquareColor], ax ; source color Done
+    mov al, [EnemySourceSquare] 
+    mov [chosenSquare], al ; chosen square Done
+    mov [destSquare], al
+
+    mov bl, al
+    mov bh, 0h
+    mov al, Squares[bx]
+    cmp al, 0h
+    jz GoOnyourWay
+    mov Squares[bx], 0h
+    cmp [isItWhite], 1H
+    jz BlackDead
+    mov bx, [numOfWhiteDead]
+    mov ArrayOfWhiteDead[bx], al
+    jmp GoOnyourWay
+    BlackDead:  mov bx, [numOfBlackDead]
+                mov ArrayOfBlackDead[bx], al
+
+    GoOnyourWay:    mov bl, [chosenSquare] ; Chosen Square Color Done
+                    mov bh, 0h
+                    push bx
+                    CALL SquaresCalculation ; rowX and rowY aheh
+                    add sp, 2h
+                    mov bl, [chosenSquare]
+                    mov bh, 0h
+                    mov al, [chessData+9D00h+bx]
+                    mov [chosenSquareColor], al
+
+    CALL GAME
+    mov [Enemy], 0h
+
+    mov [WhichTurn], OFFSET chosenSquareBlack ; Source
+    mov [WhichToExchange], OFFSET chosenSquare ; Destination
+    mov [WhichIsEnemy], OFFSET chosenSquare    ; Copy My Move to Enemy to detect
+    CALL SwitchTurns
+    mov [Esource], 0h
+    jmp NothingToDo
+
+    SaveBeforeDoingNothing:    cmp [Esource], 0h
+                                jnz NothingToDo
+                                mov [Esource], al
+                                cmp al, 0h
+                                jz NothingToDo
+                                dec [Esource]
+    NothingToDo:    RET
+RecieveData     ENDP
 
 End main
