@@ -3,10 +3,22 @@
 .stack 64
 .data
 
+;--------------------------user welcome------------------------------------
+        box        dB 219,"                                                                              " ,219,"$"
+        welcome    db 219,"                           welcome to Game of Pawns                           ",219
+                   dB 219,"                            Are you ready to Rook?                            ",219,'$'
+        Hello      db 10,13,219,"                         Please Enter Your UserName:"  ,'$'
+        hello2     db 10,13,219,"           Hello ",219,'$'
+        validation db 10,13,219,"                                Invalid Username",'$'
+        
+        Username   db 15,?,15 dup('$')
+        enter1     db 10,13,'$'
+;--------------------------------------------------------------
+
 Esource         db      ?
 Edest           db      ?
 
-chosenSquare    db     3BH ; To Whom is moving variables. Please note to move these variables togetherrrrrrrrrrrrrrrrr.
+chosenSquare    db     3H ; To Whom is moving variables. Please note to move these variables togetherrrrrrrrrrrrrrrrr.
 TimerFlag db    0h; 
 chosenSquareColor   DB  ? ; 
 numOfDirections         db      0h ; Procedure Rules sets those variables according to the piece
@@ -53,7 +65,7 @@ numOfWhiteDead          dw      0h
 ArrayOfBlackDead             db      16 DUP(0h)
 numOfBlackDead          dw      0h
 ArrayOfMoves            db      55h DUP(?)
-isItWhite               db      0h ; 0h ->white ; 1h -> black;  
+isItWhite               db      1h ; 0h ->white ; 1h -> black;  
 RepetionCounter         db      1h
 GoToNext                db      1h
 NewSourceSquare         db      ?
@@ -106,16 +118,30 @@ chatmessage     db       'Chat mode','$'
 waitchatmes     db       'There is a chat invitation. If you want to accept it click f1','$'
 waitplaymes     db       'There is a game invitation. If you want to accept it click f2','$'   
 endmessage             db       'The Program has been ended','$'
+winnerb         DB        'Black Player is the winner','$'
+winnerw         DB        'White Player is the winner','$'
 indicator        DB         0
+
+inliney     db          0H
+inliney1    db          0dh
+inlinex     db          20H
+inlinex1    dB          20h
 
 KingW          db 0h  
 KingB          db 0h 
 BlackKingCheckMate db 0h ;
 WhiteKingCheckMate db 0h ;
+CurrentKingCheckMate    db      0h
 KingTobeChecked    db 0h ; 
 BlackWhiteFlag     db 1h ; 
 KnightCheckMate   db  ? ; 
-CHECKmsg          db  'CheckMate' , '$';  
+CHECKmsg          db  'Check' , '$'; 
+
+
+boardWidth      dw     320d
+boardHeight     dw     200d
+ColorToDraw     Db     05AH
+StartDraw       dw     44d
 ;--------------------------timer------------------------------------
 time_left dB 64 dup(0)
 ready_to_move dB  64 dup(1)
@@ -382,6 +408,14 @@ mov ds , ax ;
     mov al,00011011b
     out dx,al
 
+call welcome_box   
+call clear_screen
+    mov al,0
+    mov ah,2
+                
+    mov dx,0A0Ah
+    int 0Ah ; Eh daaaaaaaaaaaaaaaaaa
+
 ClearScreem:    mov ax,0003h                ;; clear the screen
 int 10h    
         
@@ -595,6 +629,21 @@ INT 21H
 mov ah,0;
 mov al,13h;
 int 10h;
+
+;   This handles the rest of the background
+mov [StartDraw] , 0h 
+call DrawIntialBoard;
+mov[boardHeight], 200d; 
+mov [boardWidth], 3h; 
+mov [ColorToDraw] ,08h;
+mov [StartDraw], 45d 
+call DrawIntialBoard;
+mov[boardHeight], 200d; 
+mov [boardWidth], 3h; 
+mov [ColorToDraw] ,08h;
+mov [StartDraw], 248d 
+call DrawIntialBoard;
+
 ; set the handleFile for drawing empty  grid  
 MOV DX, OFFSET boardFile
 MOV CX, 9C40H ; pixel number 200d  * 200d 
@@ -646,7 +695,7 @@ mov [Currentcolor], dx
 jmp SkipFirstTime
 
 GAMELBLBlack:
-mov [isItWhite], 0h
+mov [isItWhite], 1h
 SkipFirstTime: 
 CALL GAME
 CALL RecieveData
@@ -669,6 +718,7 @@ CALL RecieveData
                           jz RIGHT 
                           cmp ah , 4Bh;  ascii for left 
                           jz LEFT;
+                          jmp inlinechat
                         exit:
                           jmp MoveSquareBlack;   
             ; in this part , i just move rowX and rowY variables according to the key pressed , also i make sure that the flickering color is not getting out of the grid 
@@ -706,11 +756,44 @@ CALL RecieveData
             jmp SWITCHBLACK
 
 SWITCHBLACK:    jmp GAMELBLBlack
+inlinechat:
+    push dx  
+    mov bx, 0H
 
+    beforeStart: 
+    cmp [inlinex+bx],28H
+    jz increasey
+    newline:
+    mov ah,2                    
+    mov dl, [inlinex+bx] 
+    mov dh, [inliney+bx]
+    int 10h
+    mov ah,2 
+    mov dl,al
+    int 21h
+
+    mov dx, 3f8h
+    out dx, al    
+    ReadNotWrite:   in al, dx
+
+    inc [inlinex+bx]
+    inc bx
+    cmp bx, 2h
+    jb beforeStart
+    pop dx
+    jmp exit
+    increasey:
+    inc [inliney+bx]
+    mov [inlinex+bx],20H
+    jmp newline
 ;mov ah , 0h ;
 ;mov al , 3h ;
 ;int 10h ;
 ; call interrup to terminate the program the return to OS 
+prefinish:
+Call showwinner
+jmp ClearScreem
+
 finish:  mov ah , 4ch ;
 int 21h;
 
@@ -897,6 +980,7 @@ push di
 mov di, [rowY]
 push di
 
+mov [RepetionCounter], 0h ; Solves the issue of a crazy pieces
 mov cl, [numOfDirections]
 mov bx, 0h
 mov [DirectionCounter], 0h
@@ -950,7 +1034,7 @@ INDIRECTION:        mov al, ch
                     DESELECTLBL: mov ax, 35h
                               mov bx, di
                               mov bh, 0ch
-                              cmp ch, [destSquare]
+                              cmp ch, [chosenSquare]
                               jnz DRAW
                               mov [chosenSquareColor], bl
 
@@ -1375,6 +1459,12 @@ GAME    PROC
         mov bh, 0h
         cmp Squares[bx], 0h
         jz NOKILL
+        
+        cmp Squares[bx],1H
+        jz prefinish1
+        cmp Squares[bx],11H
+        jz prefinish2
+
         mov al, Squares[bx]
         cmp [isItWhite], 0h ; IsitWhite currently is the enemy not always.
         jz WhiteEnemy
@@ -1400,6 +1490,13 @@ GAME    PROC
         executetokin: 
         dec freezingtime
         mov al,[freezingtime]
+        jmp continue
+
+        prefinish1:
+        mov indicator,1
+        jmp continue
+        prefinish2:
+        mov indicator,2
         
         continue:
         mov al, [destSquare]
@@ -1532,7 +1629,11 @@ GAME    PROC
 
 
 ; this part resets every thing for the next loop 
-Reset:  CALL CheckMate
+Reset:  cmp indicator,1
+jz prefinish
+cmp indicator,2
+jz prefinish
+CALL CheckMate
 mov ax, [destX]
 mov [rowX], ax
 mov ax, [destY]
@@ -1844,24 +1945,45 @@ KingDead:
 pop ax  ; 
 mov [NewSourceSquare] , al ; 
 mov [sourceSquare], ah ;
-cmp [WhiteKingCheckMate] , 1h;  
-jnz BlackTEST  
-mov ah,2
-mov dx,011fh
-int 10h
 
-mov ah, 9
-mov dx, offset CHECKmsg
-int 21h
-BlackTEST :
-cmp [BlackKingCheckMate] , 1h; 
-jnz ENDTEST 
-mov ah,2
-mov dx,171fh
-int 10h;  
-mov ah, 9
-mov dx, offset CHECKmsg
-int 21h
+MesTEST :     mov al, [CurrentKingCheckMate]
+              cmp [isItWhite], 1h
+              jnz BlackMessage
+              XOR al, [WhiteKingCheckMate]
+              jz ENDTEST
+              mov bl, [WhiteKingCheckMate]
+              mov [CurrentKingCheckMate], bl
+              mov ah, 2H
+              mov dx, 0100h
+              int 10h
+              cmp [WhiteKingCheckMate], 1h
+              jz PrintWarning
+              jmp Remove
+
+BlackMessage:   XOR al, [BlackKingCheckMate]
+                jz ENDTEST
+                mov bl, [BlackKingCheckMate]
+                mov [CurrentKingCheckMate], bl
+                mov ah, 2H
+                mov dx, 1700h
+                int 10h
+                cmp [BlackKingCheckMate], 1h
+                jz PrintWarning
+                jmp Remove
+
+PrintWarning:   mov ah, 9h
+                mov dx, offset CHECKmsg
+                int 21h
+                jmp ENDTEST
+
+Remove:         mov ah, 9h
+                mov bh, 0h
+                mov al, 20h
+                mov cx, 5h
+                mov bl, 0fah
+                int 10h
+
+
 ENDTEST: 
 RET 
 CheckMate ENDP
@@ -2379,5 +2501,246 @@ RecieveData         PROC
                                 dec [Esource]
     NothingToDo:    RET
 RecieveData     ENDP
+
+showwinner Proc
+mov ah,2ch
+int 21H
+add dh,5h
+mov [freezingtime],dh
+cmp indicator,2
+jz whitewinner
+jnz blackwinner
+blackwinner:
+mov ah,9
+mov dx, offset winnerb
+int 21h
+jmp winnernotification
+whitewinner:
+mov ah,9
+mov dx, offset winnerw
+int 21h
+winnernotification:
+mov ah,2ch
+int 21H
+cmp dh,freezingtime
+jnz winnernotification
+
+Ret;
+showwinner ENDP
+
+DrawIntialBoard proc
+mov dx, [StartDraw];
+add [boardWidth] ,dx;
+
+MOV CX, [StartDraw]
+MOV DX, 0H
+MOV AH, 0CH
+
+DRAWROW:    MOV AL, [ColorToDraw];
+            INT 10H
+            INC CX
+            CMP CX, [boardWidth]
+JNZ DRAWROW
+
+MOV CX, [StartDraw]
+INC DX
+CMP DX, [boardHeight]
+
+JNZ DRAWROW
+RET 
+DrawIntialBoard ENDP
+
+welcome_box proc 
+
+                mov al,0
+                mov ah,2
+                
+                mov dx,0A0Ah
+                int 0Ah
+         
+          
+            
+            
+           
+            call clear_screen
+
+            
+
+                
+       
+
+             call draw_line
+
+             mov dl,0h
+                mov dh,018h
+                
+                call set_cursor
+
+                call draw_header
+
+
+
+                
+                
+             mov dl,0h
+                mov dh,0h
+                
+                call set_cursor
+                call draw_header
+            
+
+                mov dl,5
+                mov dh,5h
+                
+                call set_cursor
+                
+            
+            call new_line
+                
+             
+                mov ah,9
+                mov dx,offset welcome
+                int 21h
+
+                call new_line
+            
+            
+              
+  
+        User:   mov ah,9
+                mov dx,offset hello
+                int 21h
+
+                mov ah,0Ah
+                mov dx,offset username
+                int 21h
+
+                mov BH,username+2
+                CMP BH,41H
+                JB  invalid
+                cmp BH,7AH
+                JA  Invalid
+                CMP BH,5BH
+                JB  VALID
+                CMP BH,61H
+                JB  INVALID
+
+        VALID:  mov ah,9
+                mov dx,offset hello2
+                int 21h
+
+                mov ah,9
+                mov dx,offset username+2
+                int 21h
+
+                mov ah,9
+                mov dx,offset enter1
+                int 21h
+                jmp EXIT_welcome
+                
+
+           
+
+        Again1:  mov AH,01
+                INT 16H
+                JZ  NEXT_welcome
+                MOV AH,0
+                INT 16H
+
+                CMP AL,1BH
+                JE  EXIT_welcome
+                MOV AH,1
+                MOV DX,01
+                INT 14h
+
+        NEXT_welcome:   MOV AH,03
+                MOV DX,01
+                INT 14h
+                AND AH,01
+                CMP AH,01
+                JNE Again1
+                MOV AH,02
+                MOV DX,01
+                INT 14h
+                MOV DL,AL
+                MOV AH,02
+                INT 21h
+                JMP Again1
+
+       
+
+        invalid:
+                mov dh,8h 
+                mov dl,0H
+
+                call set_cursor
+
+               
+                mov ah,9
+               mov dx,offset validation
+              int 21h
+                jmp user
+EXIT_welcome:
+ret
+welcome_box endp
+ ;--------------------------draw box------------------------------------
+         draw_line    proc
+         mov cx,24
+             .draw_line:
+              mov ah,9
+                mov dx,offset box
+                int 21h 
+            loop .draw_line
+            RET
+          draw_line  endp
+
+          draw_header proc
+            mov ah, 02h ; Set AH to 02h to write a character to the screen
+                mov dl, 219 ; Set DL to the ASCII code for the character to write
+                mov cx, 80 ; Set CX to the number of times to write the character
+
+                write_char:
+                int 21h  ; Call the interrupt to write the character
+                loop write_char  ; Decrement CX and go back to write_char if CX is not 0
+            ret
+          draw_header endp
+
+        
+
+
+            clear_screen proc
+                 ;--------------------------clear screen------------------------------------
+            mov ax,0600h
+            mov bh,07
+            mov cx,0
+            mov dx,184FH
+            int 10h
+               ;--------------------------------------------------------------
+               ret
+               clear_screen endp
+
+
+        set_cursor proc
+        
+        mov ah, 02h ; Set AH to 02h to set the cursor position
+        mov bh, 0   ; Set BH to 0 to specify the active page
+        ;mov dh, set_cursorX  ; Set DH to the row number (0-based)
+        ;mov dl, set_cursorY ; Set DL to the column number (0-based)
+      
+
+        int 10h     ; Call the BIOS interrupt
+
+
+        ret
+        set_cursor endp
+
+        new_line proc
+           mov ah,9
+                mov dx,offset enter1
+                int 21h
+        
+        ret
+new_line endp
+
 
 End main
