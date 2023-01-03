@@ -111,9 +111,12 @@ freezingtime        db      3h
 
 exitCondition       db      0h
 
-message1        db       'To Start Chatting Press F1','$'
-message2        db       'To Start the game Press F2','$'
-message3        db       'To End The Program Press ESC','$'
+;message1        db       'To Start Chatting Press F1','$'
+;message2        db       'To Start the game Press F2','$'
+;message3        db       'To End The Program Press ESC','$'
+message1        db       '                To Start Chatting Press F1',10,13
+message2        db       '                          To Start the game Press F2',10,13
+message3        db       '                          To End The Program Press ESC','$'
 chatmessage     db       'Chat mode','$'
 waitchatmes     db       'There is a chat invitation. If you want to accept it click f1','$'
 waitplaymes     db       'There is a game invitation. If you want to accept it click f2','$'   
@@ -416,21 +419,47 @@ call clear_screen
     mov dx,0A0Ah
     int 0Ah ; Eh daaaaaaaaaaaaaaaaaa
 
-ClearScreem:    mov ax,0003h                ;; clear the screen
-int 10h    
+ClearScreem:     
         
 again:
+call clear_screen ;mov [second], 0h
+mov al, 3h
+mov ah, 0h
+int 10h
     
-showmain message1,message2,message3
+;showmain message1,message2,message3
+mov dl,10
+    mov dh,5
+call set_cursor
+
+ mov ah,9h
+    mov dx,offset message1
+    int 21h
+
 printline    
     
 incorrect:
-mov ah,0h    
+
+;cmp [second], 1h
+;jnz Second1
+;mov [second], 0h
+;
+Second1: mov ah,0h    
 int 16h
 push ax
 pop ax
-    
-cmp ah, 01h                  ;; end program
+
+;mov dx, 3FDh
+;in al, dx
+;AND al, 1h
+;jz CheckStart
+;
+;mov dx, 3F8H
+;in ah, dx
+;mov [second], 1h
+;
+
+CheckStart: cmp ah, 01h                  ;; end program
 jz finish
     
 cmp ah,3bH                  ;; check chat
@@ -439,7 +468,10 @@ jz Chat
 cmp ah,3ch                  ;; check game                                        
 jz play
 
-jnz incorrect               
+;cmp [second], 1h
+;jz CheckStart
+;
+;jmp incorrect               
 
 Chat:
 printnotification waitchatmes    
@@ -610,8 +642,19 @@ jz again
         
 play:
 printnotification waitplaymes
+;cmp [second], 1h
+;jnz WaitforResponse
 mov ah,0h
 int 16h
+;jmp 
+
+;WaitforResponse:  mov dx, 3fdh
+;in al, dx
+;AND al, 1h
+;jz WaitforResponse
+
+
+
 cmp ah,3ch
 jnz again
 jmp letsstart
@@ -631,18 +674,7 @@ mov al,13h;
 int 10h;
 
 ;   This handles the rest of the background
-mov [StartDraw] , 0h 
-call DrawIntialBoard;
-mov[boardHeight], 200d; 
-mov [boardWidth], 3h; 
-mov [ColorToDraw] ,08h;
-mov [StartDraw], 45d 
-call DrawIntialBoard;
-mov[boardHeight], 200d; 
-mov [boardWidth], 3h; 
-mov [ColorToDraw] ,08h;
-mov [StartDraw], 248d 
-call DrawIntialBoard;
+
 
 ; set the handleFile for drawing empty  grid  
 MOV DX, OFFSET boardFile
@@ -671,7 +703,27 @@ mov cx , 30H ; return cx to its origin value
 dec dx ; decrement to start drawing the second row 
 cmp dx, 0h;
 JNE drawingloop;
+mov [StartDraw] , 0h 
+mov[boardHeight], 200d; 
+mov [boardWidth], 48d;
+mov [ColorToDraw], 5ah ;
+call DrawIntialBoard;
 
+mov [StartDraw] , 248d  
+mov[boardHeight], 200d; 
+mov [boardWidth], 72d;
+call DrawIntialBoard;
+
+mov[boardHeight], 200d; 
+mov [boardWidth], 3h; 
+mov [ColorToDraw] ,08h;
+mov [StartDraw], 45d 
+call DrawIntialBoard;
+mov[boardHeight], 200d; 
+mov [boardWidth], 3h; 
+mov [ColorToDraw] ,08h;
+mov [StartDraw], 248d 
+call DrawIntialBoard;
 ;waiting to press ENTER Key to display pieces 
 mov ah , 0h ;
 int 16h ;
@@ -1732,7 +1784,7 @@ FINISHGAME:
         sub dh , cl ; 
         cmp [TimerFlag] , 3h; 
         jB comp6
-        cmp dh , 2h ; 
+        cmp dh , 3h ; 
         jb FinishTimer
         jmp comp3
 
