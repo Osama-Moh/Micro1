@@ -718,7 +718,7 @@ CALL RecieveData
                           jz RIGHT 
                           cmp ah , 4Bh;  ascii for left 
                           jz LEFT;
-                          jmp inlinechat
+                          ;jmp inlinechat
                         exit:
                           jmp MoveSquareBlack;   
             ; in this part , i just move rowX and rowY variables according to the key pressed , also i make sure that the flickering color is not getting out of the grid 
@@ -742,7 +742,7 @@ CALL RecieveData
             sub [chosenSquare], 1h ;the number of square decrement by 1h;  
             jmp MoveSquareBlack;
             RIGHT:
-            cmp[rowY] ,  0AFh; 
+            cmp [rowY],  0AFh; 
             jz exit
             add [rowY],19h;
             add [chosenSquare], 1h ;  the number of square increase by 1h;  
@@ -756,36 +756,36 @@ CALL RecieveData
             jmp SWITCHBLACK
 
 SWITCHBLACK:    jmp GAMELBLBlack
-inlinechat:
-    push dx  
-    mov bx, 0H
-
-    beforeStart: 
-    cmp [inlinex+bx],28H
-    jz increasey
-    newline:
-    mov ah,2                    
-    mov dl, [inlinex+bx] 
-    mov dh, [inliney+bx]
-    int 10h
-    mov ah,2 
-    mov dl,al
-    int 21h
-
-    mov dx, 3f8h
-    out dx, al    
-    ReadNotWrite:   in al, dx
-
-    inc [inlinex+bx]
-    inc bx
-    cmp bx, 2h
-    jb beforeStart
-    pop dx
-    jmp exit
-    increasey:
-    inc [inliney+bx]
-    mov [inlinex+bx],20H
-    jmp newline
+;inlinechat:
+;    push dx  
+;    mov bx, 0H
+;
+;    beforeStart: 
+;    cmp [inlinex+bx],28H
+;    jz increasey
+;    newline:
+;    mov ah,2                    
+;    mov dl, [inlinex+bx] 
+;    mov dh, [inliney+bx]
+;    int 10h
+;    mov ah,2 
+;    mov dl,al
+;    int 21h
+;
+;    mov dx, 3f8h
+;    out dx, al    
+;    ReadNotWrite:   in al, dx
+;
+;    inc [inlinex+bx]
+;    inc bx
+;    cmp bx, 2h
+;    jb beforeStart
+;    pop dx
+;    jmp exit
+;    increasey:
+;    inc [inliney+bx]
+;    mov [inlinex+bx],20H
+;    jmp newline
 ;mov ah , 0h ;
 ;mov al , 3h ;
 ;int 10h ;
@@ -980,7 +980,7 @@ push di
 mov di, [rowY]
 push di
 
-mov [RepetionCounter], 0h ; Solves the issue of a crazy pieces
+mov [RepetionCounter], 1h ; Solves the issue of a crazy pieces
 mov cl, [numOfDirections]
 mov bx, 0h
 mov [DirectionCounter], 0h
@@ -2419,7 +2419,12 @@ RecieveData         PROC
     mov dx , 3F8H		; Transmit data register
     out dx ,  al
 
-    mov [EnemySourceSquare], 0h
+    cmp al, 0h
+    jz NoWait
+    mov ah, 0h
+    int 16h
+
+    noWait: mov [EnemySourceSquare], 0h
 
     CONTTTTT: cmp al, 0h
     jz nostop
