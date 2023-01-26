@@ -3,6 +3,9 @@
 .stack 64
 .data
 
+TimeOfFlickering        dw   ?
+ahehPtr                 dw   ?
+
 ;--------------------------user welcome------------------------------------
         box        dB 219,"                                                                              " ,219,"$"
         welcome    db 219,"                           welcome to Game of Pawns                           ",219
@@ -26,7 +29,6 @@ ArrayOfDirections       db      8 dup(0h), 0h ; Permissible moves for a piece
 ArrayOfRepetitions      db      8 dup(0h), 0h ;
 sourceSquare    db      0FFH ; square to be moved 
 destSquare      db      0FFH ; destination after movment 
-FlickeringTime  db      1h
 SelectionKey    db      0dh
 SELECTED        db      0h
 entered        db      5 dup(0ffh)
@@ -47,7 +49,6 @@ ArrayOfDirectionsBlack       db      8 dup(0h), 0h ; Permissible moves for a pie
 ArrayOfRepetitionsBlack      db      8 dup(0h), 0h ;
 sourceSquareBlack    db      0FFH ; square to be moved 
 destSquareBlack      db      0FFH ; destination after movment 
-FlickeringTimeBlack  db      1h
 SelectionKeyBlack    db      0dh
 SELECTEDBlack        db      0h
 enteredBlack        db      5 dup(0ffh)
@@ -744,6 +745,16 @@ CALL GetSquareColor ; get color in current rowx and rowy
 mov dl, [chosenSquareColor] ; color in the dx ; 
 mov dh, 0h
 mov [Currentcolor], dx
+mov ah, 2ch
+int 21h
+mov al, dh
+mov ah, 0h
+mov cx, 3e8h
+mov bx, dx
+mul cx
+mov bh, 0h
+add ax, dx
+mov [TimeOfFlickering], ax
 jmp SkipFirstTime
 
 GAMELBLBlack:
@@ -770,6 +781,8 @@ CALL RecieveData
                           jz RIGHT 
                           cmp ah , 4Bh;  ascii for left 
                           jz LEFT;
+                          cmp al, 0dh
+                          jmp SWITCHBLACK
                           ;jmp inlinechat
                         exit:
                           jmp MoveSquareBlack;   
@@ -1390,19 +1403,27 @@ GAME    PROC
           jmp flashing;
           flashColor:   mov ax, [Flicker]
           add ax, 0c00h
-          flashing: dec [FlickeringTime]
-                    cmp [FlickeringTime], 0h
-                    jnz SourceCheck
+          flashing: mov [ahehPtr], sp
                     PUSH DX ; color of the current backgrnd;
                     PUSH AX ; color that will be drawn; 
+                    mov ah, 2ch
+                    int 21h
+                    mov al, dh
+                    mov ah, 0H
+                    mov cx, 3e8h
+                    mov bx, dx
+                    mul cx
+                    mov bh, 0h
+                    mov si, ax
+                    mov ax, Bx
+                    mov cx, 0ah
+                    mul cx
+                    add ax, si
+                    sub ax, [TimeOfFlickering]
+                    cmp ax, 82h
+                    jb SourceCheck
+                    add [TimeOfFlickering], ax
                     CALL DrawSquare ; draw square 
-                    ; wait 1 second to flicker again 
-                    MOV CX, 2H
-                    MOV DX, 0000H
-                    MOV AH, 86H
-                    INT 15H       
-
-                    mov [FlickeringTime], 9h
 
                     pop dx ; color that is drawn during last call of DrawSquare , will be used in the next loop    
                     sub dx, 0c00h ; sub 0c because ax was 0c15 ;
@@ -1411,7 +1432,10 @@ GAME    PROC
 
 ;;;;;;;;;;;;;;;;;;;;;; Moving Pieces
         ; selection begins when we press ENTER kay 
-        SourceCheck:    cmp [SELECTED], 1h
+        SourceCheck:    cmp [ahehPtr], sp
+                        jz NoPopping
+                        add sp, 4h        
+                        NoPopping:  cmp [SELECTED], 1h
                         jnz SeeKeys
                         NoProblem:  cmp [EnemySourceSquare], 0h
                         jz SeeKeys
@@ -1828,7 +1852,7 @@ SwitchTurns     PROC
 mov di, [WhichTurn]
 mov bx, [WhichToExchange]
 mov cx, bx
-add cx, 21h
+add cx, 20h
 
 TurnsLoopByte:  mov al, BYTE PTR[di]
                 mov BYTE PTR [bx], al
@@ -1839,7 +1863,7 @@ TurnsLoopByte:  mov al, BYTE PTR[di]
 
 mov al, [di]
 mov si, [WhichIsEnemy]
-add si, 21h
+add si, 20h
 mov [si], al
 inc di
 inc bx
@@ -2294,14 +2318,21 @@ HandleBatchExecution    PROC
     
     ;;if source is empty kill piece 
     mov bl, [sourceSquare]
+    mov cl, [chessData+9D00h+bx]
+    mov ch, 0h
+    mov [sourceSquareColor], cx
     mov al, [destSquare] ; No use
-    cmp Squares[bx], 0H
+    mov ah, 0h
+    mov di, ax
+    cmp Squares[di], 0H
     jz forcedkill
     
     ;;if source is the destination no effect
     cmp ax, bx
     jz goback
     
+    mov bx, di
+
     ;;if same player or not
     cmp [isItWhite], 1h
     jz TryBlack
@@ -2318,19 +2349,16 @@ HandleBatchExecution    PROC
     mov ch, 0h
     mov [Currentcolor], cx
     mov [chosenSquare], bl
+    mov [destSquare], bl
+    MOV [Enemy], 1h
+
     push ax
     CALL SquaresCalculation
     CALL GAME
+    ADD SP, 2H
 
-    pop bx
-    mov cl, [chessData+9D00h+bx]
-    mov [chosenSquareColor], cl
-    mov ch, 0h
-    mov [Currentcolor], cx
-    mov [chosenSquare], bl
-    push ax
-    CALL SquaresCalculation
-    CALL Game
+    mov [Enemy], 0h
+
 
     inc [sizeEntered]
 
@@ -2371,7 +2399,7 @@ forcedkill:     mov di, 0h
 
 
 
-forcedkill2:
+forcedkill2:        
 ;;remove selected piece
 RET 
 
@@ -2467,14 +2495,11 @@ RET;
 random ENDP
 
 RecieveData         PROC
+    cmp [EnemySourceSquare], 0h
+    jz noWait
     mov al, [EnemySourceSquare]
     mov dx , 3F8H		; Transmit data register
     out dx ,  al
-
-    cmp al, 0h
-    jz NoWait
-    mov ah, 0h
-    int 16h
 
     noWait: mov [EnemySourceSquare], 0h
 
@@ -2493,8 +2518,13 @@ RecieveData         PROC
     jbe SaveBeforeDoingNothing
     sub al, 41h
     mov [EnemySourceSquare], al
+
+    cmp al, [sourceSquare]
+    jnz NoForcedDeselect
+    mov [DESELECT], 1h
+    CALL ColorSelected
     
-    mov [WhichTurn], OFFSET chosenSquare ; Source
+    NoForcedDeselect:   mov [WhichTurn], OFFSET chosenSquare ; Source
     mov [WhichToExchange], OFFSET chosenSquareBlack ; Destination
     mov [WhichIsEnemy], OFFSET chosenSquareBlack    ; Copy My Move to Enemy to detect
     CALL SwitchTurns
