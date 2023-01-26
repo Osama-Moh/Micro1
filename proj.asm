@@ -2580,12 +2580,9 @@ RecieveData         PROC
     mov [Esource], 0h
     jmp NothingToDo
 
-    SaveBeforeDoingNothing:    cmp [Esource], 0h
-                                jnz NothingToDo
-                                mov [Esource], al
-                                cmp al, 0h
-                                jz NothingToDo
-                                dec [Esource]
+    SaveBeforeDoingNothing:    dec al
+                               mov [Esource], al
+                               
     NothingToDo:    RET
 RecieveData     ENDP
 
